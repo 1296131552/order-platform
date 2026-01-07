@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.order.platform</groupId>
+        <artifactId>order-platform-backend</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>order-platform-user</artifactId>
+    <name>用户权限模块</name>
+    <description>用户权限模块：用户、角色、权限管理</description>
+
+    <dependencies>
+        <!-- Common 模块 -->
+        <dependency>
+            <groupId>com.order.platform</groupId>
+            <artifactId>order-platform-common</artifactId>
+        </dependency>
+
+        <!-- Lombok -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- Swagger/Knife4j -->
+        <dependency>
+            <groupId>com.github.xiaoymin</groupId>
+            <artifactId>knife4j-openapi3-jakarta-spring-boot-starter</artifactId>
+        </dependency>
+    </dependencies>
+</project>
