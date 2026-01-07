@@ -16,6 +16,7 @@
 - [核心业务逻辑](#核心业务逻辑)
 - [数据权限设计](#数据权限设计)
 - [开发进度](#开发进度)
+- [开发思路与设计决策](#开发思路与设计决策) ⭐
 - [文档更新规范](#文档更新规范)
 
 ---
@@ -59,11 +60,12 @@
 
 | 功能 | 接口 | 状态 | 说明 |
 |------|------|------|------|
-| 用户登录 | `POST /api/auth/login` | ⏳ 待开发 | 支持用户名/邮箱/手机号登录 |
-| 获取当前用户 | `GET /api/auth/current` | ⏳ 待开发 | 返回用户信息、角色、权限 |
-| 用户登出 | `POST /api/auth/logout` | ⏳ 待开发 | 清除Token，记录登出日志 |
-| 刷新Token | `POST /api/auth/refresh` | ⏳ 待开发 | Token无感刷新 |
-| 修改密码 | `POST /api/auth/change-password` | ⏳ 待开发 | 旧密码验证后修改 |
+| 用户登录 | `POST /api/auth/login` | ✅ 已完成 | 支持用户名/邮箱/手机号登录 |
+| 获取当前用户 | `GET /api/auth/current` | ✅ 已完成 | 返回用户信息、角色、权限 |
+| 用户登出 | `POST /api/auth/logout` | ✅ 已完成 | 清除Token，记录登出日志 |
+| 刷新Token | `POST /api/auth/refresh` | ✅ 已完成 | Token无感刷新 |
+| 修改密码 | `POST /api/auth/change-password` | ✅ 已完成 | 旧密码验证后修改 |
+| 重置密码 | `POST /api/auth/reset-password/{id}` | ✅ 已完成 | 管理员重置用户密码 |
 
 ### 2. 用户管理
 
@@ -500,29 +502,34 @@ public class DataScopeInterceptor implements InnerInterceptor {
   - [x] 预定义角色数据（5个标准角色）
   - [x] 预定义权限数据（完整权限初始化）
 
-- [ ] 1.2 实体类和Mapper
+- [x] 1.2 实体类和Mapper ✅ 已完成（2026-01-07）
   - [x] User.java（用户实体，25字段）✅ 已创建
-  - [ ] Role.java（角色实体）
+  - [x] Role.java（角色实体）✅ 已创建
   - [x] UserRole.java（用户角色关联）✅ 已创建并修复
-  - [ ] RolePermission.java（角色权限关联）
+  - [x] RolePermission.java（角色权限关联）✅ 已创建
   - [x] UserMapper.java ✅ 已创建
-  - [ ] RoleMapper.java
+  - [x] RoleMapper.java ✅ 已创建
   - [x] UserRoleMapper.java ✅ 已创建并修复
-  - [ ] RolePermissionMapper.java
+  - [x] RolePermissionMapper.java ✅ 已创建
 
-- [ ] 1.2.1 认证辅助工具
+- [x] 1.2.1 认证辅助工具 ✅ 已完成（2026-01-07）
   - [x] AuthHelper.java（User → CurrentUser转换）✅ 已创建
+  - [x] PasswordEncoderUtil.java（密码加密工具）✅ 已创建
 
-- [ ] 1.3 认证登录功能
-  - [ ] 用户登录（支持用户名/邮箱/手机号）
-  - [ ] 密码错误锁定（连续5次锁定30分钟）
-  - [ ] 密码过期检查
-  - [ ] 用户状态检查
-  - [ ] 查询用户角色和权限
-  - [ ] 查询数据权限范围
-  - [ ] 生成JWT Token
-  - [ ] 更新登录信息
-  - [ ] 记录操作日志
+- [x] 1.3 认证登录功能 ✅ 已完成（2026-01-07）
+  - [x] 用户登录（支持用户名/邮箱/手机号）✅ 已实现
+  - [x] 密码错误锁定（连续5次锁定30分钟）✅ 已实现
+  - [x] 密码过期检查✅ 已实现
+  - [x] 用户状态检查✅ 已实现
+  - [x] 查询用户角色和权限✅ 已实现
+  - [x] 查询数据权限范围✅ 已实现
+  - [x] 生成JWT Token✅ 已实现
+  - [x] 更新登录信息✅ 已实现
+  - [x] 用户登出✅ 已实现
+  - [x] Token刷新✅ 已实现
+  - [x] 修改密码✅ 已实现
+  - [x] 重置密码✅ 已实现
+  - [ ] 记录操作日志⏳ 待集成OperationLogService
 
 - [ ] 1.4 用户管理功能
   - [ ] 用户列表（分页、多条件筛选）
@@ -581,6 +588,549 @@ public class DataScopeInterceptor implements InnerInterceptor {
   - [ ] 活跃用户统计
   - [ ] 部门分布统计
   - [ ] 登录趋势统计
+
+---
+
+## 开发思路与设计决策
+
+> **本章节详细说明用户模块的开发策略、关键技术决策和最佳实践**
+
+### 一、开发顺序建议（基于依赖关系）
+
+```
+阶段0：基础设施（1-2天）
+├── Role.java + RoleMapper
+├── RolePermission.java + RolePermissionMapper
+└── PasswordUtil（密码工具类）
+
+阶段1：认证登录（3-4天）⭐ 最优先
+├── AuthService + AuthServiceImpl
+├── AuthController（登录、登出、刷新Token）
+├── JWT工具完善
+└── 集成测试
+
+阶段2：用户管理（2-3天）
+├── UserService + UserServiceImpl
+├── UserController
+└── 数据权限集成
+
+阶段3：个人中心（1-2天）
+├── ProfileController
+└── 简单的查询和修改功能
+
+阶段4：角色管理（1-2天）
+├── RoleService + RoleServiceImpl
+├── RoleController
+└── 权限分配逻辑
+
+阶段5：数据权限拦截器（2-3天）
+├── DataScopeInterceptor
+├── DataScopeContext
+└── 集成到所有业务模块
+```
+
+**开发优先级原则**：
+1. **依赖关系优先**：认证登录 → 用户管理 → 个人中心 → 角色管理 → 数据权限
+2. **基础设施先行**：实体类和Mapper必须先完成
+3. **分层开发**：每层完成后立即测试，不要一次性写完
+4. **安全第一**：所有安全相关功能必须优先实现
+
+---
+
+### 二、各模块核心设计要点
+
+#### 2.1 认证登录模块（最重要）
+
+**核心登录流程**：
+```java
+// AuthServiceImpl.java 核心流程
+public LoginVO login(LoginDTO dto) {
+    // 1. 查询用户（支持用户名/邮箱/手机号）
+    User user = userMapper.selectByAccount(dto.getAccount());
+
+    // 2. 检查用户状态（is_enabled, is_locked）
+    validateUserStatus(user);
+
+    // 3. 验证密码（BCrypt）
+    if (!passwordEncoder.matches(dto.getPassword(), user.getPassword())) {
+        handlePasswordError(user); // 错误次数+1，5次锁定
+        throw new BusinessException("密码错误");
+    }
+
+    // 4. 检查密码过期
+    validatePasswordExpiration(user);
+
+    // 5. 查询用户角色和权限（混合策略）
+    List<String> roles = getUserRoles(user.getId());
+    List<String> permissions = getPermissions(roles);
+
+    // 6. 查询数据权限范围（从主角色）
+    DataScopeContext dataScope = buildDataScope(user, roles);
+
+    // 7. 生成JWT Token（7天有效期）
+    String token = jwtUtil.generateToken(user.getId(), roles);
+
+    // 8. 更新登录信息
+    updateLoginInfo(user.getId(), clientIp);
+
+    // 9. 记录操作日志
+    operationLogService.record(LOGIN, user.getId());
+
+    return LoginVO.builder()
+        .token(token)
+        .userInfo(AuthHelper.toCurrentUser(user, roles))
+        .permissions(permissions)
+        .dataScope(dataScope)
+        .build();
+}
+```
+
+**密码错误锁定机制**：
+```java
+// 使用Redis缓存错误次数，避免写库
+private void handlePasswordError(Long userId) {
+    String key = "login:error:" + userId;
+    Long count = redisTemplate.opsForValue().increment(key);
+    redisTemplate.expire(key, 30, TimeUnit.MINUTES);
+
+    if (count >= 5) {
+        // 锁定账户30分钟
+        userMapper.lockUser(userId, "密码错误次数过多",
+            LocalDateTime.now().plusMinutes(30));
+    }
+}
+```
+
+**安全配置**：
+```yaml
+# application.yml
+jwt:
+  secret: ${JWT_SECRET:your-secret-key-at-least-256-bits} # P0: 必须使用环境变量
+  expiration: 604800 # 7天（秒）
+  refresh-expiration: 1209600 # 14天（秒）
+```
+
+---
+
+#### 2.2 用户管理模块
+
+**数据权限设计（核心亮点）**：
+```java
+// DataScopeInterceptor.java
+@Component
+public class DataScopeInterceptor implements InnerInterceptor {
+
+    @Override
+    public void beforeQuery(...) {
+        CurrentUser user = CurrentUserHolder.get();
+        if (user == null) return;
+
+        // 获取用户的主角色数据权限类型
+        DataScopeType dataScopeType = getDataScopeType(user.getId());
+
+        // 构建SQL片段
+        String dataScopeSql = buildDataScopeSql(dataScopeType, user);
+
+        // 修改原始SQL，添加WHERE条件
+        // ... 具体实现
+    }
+
+    private String buildDataScopeSql(DataScopeType type, CurrentUser user) {
+        switch (type) {
+            case ALL:
+                return ""; // 不添加过滤
+            case DEPARTMENT:
+                return " AND department_id = " + user.getDepartmentId();
+            case SELF:
+                return " AND created_by = " + user.getId();
+            case CUSTOM:
+                return buildCustomDataScope(user); // 预留扩展
+            default:
+                return "";
+        }
+    }
+}
+```
+
+**用户查询优化**：
+```java
+// UserServiceImpl.java
+public PageResult<UserVO> listUsers(UserQueryDTO query) {
+    // 使用LambdaQueryWrapper构建动态查询
+    LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<User>()
+        .eq(User::getIsDeleted, 0);
+
+    // 动态条件（只添加非空条件）
+    Optional.ofNullable(query.getUsername()).ifPresent(
+        name -> wrapper.like(User::getUsername, name));
+    Optional.ofNullable(query.getDepartmentId()).ifPresent(
+        deptId -> wrapper.eq(User::getDepartmentId, deptId));
+
+    // 分页查询
+    Page<User> page = userMapper.selectPage(
+        new Page<>(query.getCurrent(), query.getSize()),
+        wrapper);
+
+    // 转换为VO（避免N+1查询）
+    List<UserVO> vos = page.getRecords().stream()
+        .map(this::toVO)
+        .collect(Collectors.toList());
+
+    return PageResult.of(vos, page.getTotal());
+}
+```
+
+---
+
+#### 2.3 角色管理模块
+
+**角色分配逻辑**：
+```java
+// UserRoleServiceImpl.java
+@Transactional
+public void assignRoles(Long userId, List<Long> roleIds) {
+    // 1. 验证角色存在且启用
+    List<Role> roles = roleMapper.selectBatchIds(roleIds);
+    if (roles.size() != roleIds.size()) {
+        throw new BusinessException("部分角色不存在或已禁用");
+    }
+
+    // 2. 删除旧的角色关联（软删除）
+    userRoleMapper.deleteByUserId(userId);
+
+    // 3. 插入新的角色关联
+    List<UserRole> userRoles = roleIds.stream()
+        .map(roleId -> UserRole.builder()
+            .userId(userId)
+            .roleId(roleId)
+            .roleCode(getRoleCode(roleId)) // 冗余字段，便于查询
+            .isPrimary(false)
+            .build())
+        .collect(Collectors.toList());
+
+    // 设置第一个角色为主角色
+    if (!userRoles.isEmpty()) {
+        userRoles.get(0).setIsPrimary(true);
+    }
+
+    userRoleMapper.insertBatch(userRoles);
+
+    // 4. 清除缓存
+    clearUserCache(userId);
+}
+```
+
+---
+
+#### 2.4 权限管理模块
+
+**权限注解设计**：
+```java
+// @PreAuthorize注解
+@Target({ElementType.METHOD, ElementType.TYPE})
+@Retention(RetentionPolicy.RUNTIME)
+public @interface PreAuthorize {
+    String value(); // "ORDER:VIEW"
+    LogicalType logical() default LogicalType.AND;
+}
+
+// 权限验证AOP
+@Aspect
+@Component
+public class PermissionAspect {
+
+    @Around("@annotation(preAuthorize)")
+    public Object checkPermission(ProceedingJoinPoint joinPoint,
+                                  PreAuthorize preAuthorize) {
+        CurrentUser user = CurrentUserHolder.get();
+        if (user == null) {
+            throw new BusinessException("未登录");
+        }
+
+        // 查询用户权限（从缓存）
+        List<String> permissions = permissionService.getPermissions(user.getId());
+
+        // 验证权限
+        String required = preAuthorize.value();
+        if (!hasPermission(permissions, required)) {
+            throw new BusinessException("权限不足");
+        }
+
+        return joinPoint.proceed();
+    }
+}
+```
+
+**使用示例**：
+```java
+@RestController
+@RequestMapping("/api/order")
+public class OrderController {
+
+    @PreAuthorize("ORDER:VIEW")
+    @GetMapping("/list")
+    public Result list() {
+        // 只有拥有 ORDER:VIEW 权限的用户才能访问
+    }
+
+    @PreAuthorize("ORDER:CREATE")
+    @PostMapping("/create")
+    public Result create() {
+        // 只有拥有 ORDER:CREATE 权限的用户才能访问
+    }
+}
+```
+
+---
+
+#### 2.5 个人中心模块
+
+**修改密码流程**：
+```java
+// ProfileController.java
+@PostMapping("/password")
+public Result changePassword(@RequestBody ChangePasswordDTO dto) {
+    // 1. 验证旧密码
+    CurrentUser user = CurrentUserHolder.get();
+    User dbUser = userMapper.selectById(user.getId());
+    if (!passwordEncoder.matches(dto.getOldPassword(), dbUser.getPassword())) {
+        throw new BusinessException("旧密码错误");
+    }
+
+    // 2. 验证新密码强度
+    if (!PasswordUtil.isStrong(dto.getNewPassword())) {
+        throw new BusinessException("密码强度不够");
+    }
+
+    // 3. 不能与旧密码相同
+    if (dto.getOldPassword().equals(dto.getNewPassword())) {
+        throw new BusinessException("新密码不能与旧密码相同");
+    }
+
+    // 4. 加密新密码
+    String encryptedPassword = passwordEncoder.encode(dto.getNewPassword());
+
+    // 5. 更新密码
+    userMapper.updatePassword(
+        user.getId(),
+        encryptedPassword,
+        LocalDateTime.now().plusDays(90) // 90天后过期
+    );
+
+    // 6. 记录操作日志
+    operationLogService.record(PASSWORD_CHANGE, user.getId());
+
+    return Result.success();
+}
+```
+
+---
+
+### 三、关键技术决策
+
+#### 决策1：权限存储策略
+
+**选项B**：Token中只存储roles，permissions查库 ⭐ 推荐
+- ✅ 优点：Token小，权限变更实时生效
+- ✅ 优点：配合缓存，性能可控
+- ❌ 缺点：需要查库（可缓存5分钟）
+
+**实现方案**：
+```java
+// Token中存储
+{
+  "userId": 1,
+  "roles": ["CUSTOMER_MANAGER"]
+}
+
+// permissions从Redis缓存查
+String cacheKey = "user:permissions:" + userId;
+List<String> permissions = redisTemplate.opsForValue().get(cacheKey);
+if (permissions == null) {
+    permissions = permissionMapper.selectByUserId(userId);
+    redisTemplate.opsForValue().set(cacheKey, permissions, 5, TimeUnit.MINUTES);
+}
+```
+
+---
+
+#### 决策2：数据权限实现方式
+
+**选项B**：MyBatis-Plus拦截器自动过滤 ⭐ 推荐
+```java
+// ✅ 推荐：自动拦截所有查询
+@DataScope(type = DataScopeType.SELF)
+public List<Order> listOrders() {
+    // 拦截器自动添加 WHERE created_by = #{userId}
+    return orderMapper.selectList(null);
+}
+```
+
+---
+
+#### 决策3：密码错误计数器存储
+
+**选项B**：Redis缓存 ⭐ 推荐
+```java
+redisTemplate.opsForValue().increment("login:error:" + userId);
+redisTemplate.expire(key, 30, TimeUnit.MINUTES);
+```
+- ✅ 优点：性能好
+- ✅ 优点：自动过期
+- ❌ 缺点：重启后丢失（可接受）
+
+---
+
+### 四、潜在风险和解决方案
+
+#### 风险1：N+1查询问题
+
+**问题场景**：
+```java
+// ❌ 错误：N+1查询
+List<User> users = userMapper.selectList(wrapper);
+for (User user : users) {
+    List<Role> roles = userRoleMapper.selectByUserId(user.getId()); // N次查询
+}
+```
+
+**解决方案**：
+```java
+// ✅ 正确：批量查询
+List<User> users = userMapper.selectList(wrapper);
+List<Long> userIds = users.stream().map(User::getId).collect(Collectors.toList());
+Map<Long, List<Role>> rolesMap = userRoleMapper.selectByUserIds(userIds)
+    .stream().collect(Collectors.groupingBy(UserRole::getUserId));
+```
+
+---
+
+#### 风险2：越权访问
+
+**问题场景**：客户经理A可以修改客户经理B创建的订单
+
+**解决方案**：
+```java
+// DataScopeInterceptor自动添加过滤
+// 客户经理查询订单时，SQL自动添加：
+// WHERE created_by = #{userId}
+
+// Controller接口中的userId参数校验
+@PatchMapping("/user/{id}/status")
+public Result updateStatus(@PathVariable Long id) {
+    // ✅ 正确：使用CurrentUser.getId()或校验权限
+    CurrentUser user = CurrentUserHolder.get();
+    if (!user.getRoles().contains("SYSTEM_ADMIN") && !id.equals(user.getId())) {
+        throw new BusinessException("无权操作");
+    }
+}
+```
+
+---
+
+#### 风险3：密码泄露
+
+**解决方案**：
+```java
+// LoginDTO.java
+public class LoginDTO {
+    private String account;
+    @JsonIgnore // 日志中不打印
+    private String password;
+}
+
+// 日志配置（logback-spring.xml）
+<configuration>
+    <logger name="com.order.platform" level="INFO">
+        <!-- 过滤敏感字段 -->
+    </logger>
+</configuration>
+```
+
+---
+
+### 五、测试策略
+
+#### 单元测试
+```java
+@SpringBootTest
+class AuthServiceTest {
+
+    @Test
+    void testLoginSuccess() {
+        LoginDTO dto = new LoginDTO("admin", "123456");
+        LoginVO vo = authService.login(dto);
+        assertNotNull(vo.getToken());
+    }
+
+    @Test
+    void testLoginPasswordError() {
+        // 连续5次错误密码
+        for (int i = 0; i < 5; i++) {
+            assertThrows(BusinessException.class,
+                () -> authService.login(new LoginDTO("admin", "wrong")));
+        }
+        // 第6次应该提示账户锁定
+        assertThrows(BusinessException.class,
+            () -> authService.login(new LoginDTO("admin", "123456")));
+    }
+}
+```
+
+#### 集成测试
+```java
+@SpringBootTest(webEnvironment = RANDOM_PORT)
+@AutoConfigureMockMvc
+class AuthControllerTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Test
+    void testLoginApi() throws Exception {
+        String json = "{\"account\":\"admin\",\"password\":\"123456\"}";
+        mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.token").exists());
+    }
+}
+```
+
+---
+
+### 六、核心建议总结
+
+#### 开发建议
+1. **优先级排序**：认证登录 → 用户管理 → 个人中心 → 角色管理 → 数据权限
+2. **分层开发**：每层完成后立即测试，不要一次性写完
+3. **安全第一**：
+   - 密码BCrypt加密
+   - SQL防注入（参数化查询）
+   - 越权防护（数据权限拦截器）
+   - 日志脱敏（@JsonIgnore）
+4. **性能优化**：
+   - 权限缓存（5分钟）
+   - 角色缓存（5分钟）
+   - 避免N+1查询
+   - 分页查询
+
+#### 代码质量
+- 充分的注释（指导教程项目）
+- 统一的异常处理
+- 完善的日志记录
+- 清晰的文档
+
+#### 安全检查清单
+- [ ] JWT Secret使用环境变量
+- [ ] 密码BCrypt加密
+- [ ] 密码错误5次锁定
+- [ ] 密码过期策略
+- [ ] 日志过滤敏感字段
+- [ ] SQL参数化查询
+- [ ] 数据权限自动过滤
+- [ ] 接口权限验证
 
 ---
 
@@ -718,6 +1268,100 @@ public class DataScopeInterceptor implements InnerInterceptor {
 
 ## 更新记录
 
+### v1.0.7 (2026-01-08)
+
+#### 文档同步更新
+
+**更新人**：开发组
+
+**更新内容**：
+- ✅ 同步功能清单状态
+  - 认证登录模块：6个接口全部更新为 ✅ 已完成
+  - 用户登录（POST /api/auth/login）✅
+  - 获取当前用户（GET /api/auth/current）✅
+  - 用户登出（POST /api/auth/logout）✅
+  - 刷新Token（POST /api/auth/refresh）✅
+  - 修改密码（POST /api/auth/change-password）✅
+  - 重置密码（POST /api/auth/reset-password/{id}）✅
+
+**更新原因**：
+功能清单部分状态与实际代码进度不同步，根据已完成的功能更新状态。
+
+**相关功能**：
+- 认证登录核心功能（v1.0.4 已完成）
+- 登录功能优化（v1.0.6 已完成）
+
+---
+
+### v1.0.6 (2026-01-08)
+
+#### 登录功能优化
+
+**更新人**：开发组
+
+**更新内容**：
+- ✅ **修复操作日志字段问题**
+  - 修复 `operatorId=-1` 问题（使用 SpEL 从返回值获取用户ID）
+  - 修复 `operatorName=系统` 问题（从返回值获取真实姓名）
+  - 修复 `operatorUserCode` 等字段为空问题
+  - 消除重复日志问题（统一由切面管理）
+
+- ✅ **增强 @OperationLog 注解**
+  - 新增 `operatorId` 属性（SpEL 表达式）
+  - 新增 `operatorName` 属性（SpEL 表达式）
+  - 新增 `operatorUserCode` 属性（SpEL 表达式）
+  - 新增 `operatorEmployeeNo` 属性（SpEL 表达式）
+  - 新增 `operatorPosition` 属性（SpEL 表达式）
+
+- ✅ **增强 OperationLogAspect 切面**
+  - 支持从 SpEL 表达式解析完整用户信息
+  - 优先使用 SpEL 解析结果覆盖 CurrentUserHolder 默认值
+
+- ✅ **API 文档配置**
+  - 新增 OpenAPI 配置类，支持 9 个 API 分组
+  - 修复 springdoc.api-docs.path 配置错误
+
+- ✅ **热重载功能**
+  - 集成 spring-boot-devtools
+  - 配置热重载策略
+
+**实现方式**：
+```java
+// AuthController.java
+@OperationLog(
+    module = OperationModule.USER,
+    type = OperationType.LOGIN,
+    business = BusinessType.USER,
+    businessId = "#result.data.userInfo.id",
+    operatorId = "#result.data.userInfo.id",
+    operatorName = "#result.data.userInfo.realName",
+    operatorUserCode = "#result.data.userInfo.userCode",
+    operatorEmployeeNo = "#result.data.userInfo.employeeNo",
+    operatorPosition = "#result.data.userInfo.position",
+    description = "用户登录"
+)
+```
+
+**测试结果**：
+```sql
+-- 修复前
+operator_id=-1, operator_name=系统, operator_user_code=, operator_employee_no=
+
+-- 修复后
+operator_id=2, operator_name=张三, operator_user_code=USER002,
+operator_employee_no=EMP002, operator_position=客户经理 ✅
+```
+
+**相关文件**：
+- `order-platform-common/src/main/java/com/order/platform/common/annotation/OperationLog.java`
+- `order-platform-common/src/main/java/com/order/platform/common/aspect/OperationLogAspect.java`
+- `order-platform-common/src/main/java/com/order/platform/common/config/OpenApiConfig.java`
+- `order-platform-user/src/main/java/com/order/platform/user/controller/AuthController.java`
+- `order-platform-api/pom.xml`（新增 devtools 依赖）
+- `order-platform-api/src/main/resources/application.yml`（新增 devtools 和 springdoc 配置）
+
+---
+
 ### v1.0.0 (2026-01-07)
 
 #### 初始化文档
@@ -847,6 +1491,268 @@ public class DataScopeInterceptor implements InnerInterceptor {
 - mapper/UserRoleMapper.java（已修复）
 - service/AuthHelper.java（已创建）
 - resources/sql/user.sql（已移动）
+
+---
+
+### v1.0.3 (2026-01-07)
+
+#### 新增开发思路与设计决策章节
+
+**更新人**：开发组
+
+**更新内容**：
+- ✅ 新增"开发思路与设计决策"章节
+  - 开发顺序建议（5个阶段）
+  - 各模块核心设计要点（5个模块）
+  - 关键技术决策（3个决策）
+  - 潜在风险和解决方案（3个风险）
+  - 测试策略（单元测试+集成测试）
+  - 核心建议总结
+
+**章节结构**：
+1. **开发顺序建议**：基于依赖关系的5阶段开发计划
+   - 阶段0：基础设施（Role、RolePermission实体类）
+   - 阶段1：认证登录（最优先）
+   - 阶段2：用户管理
+   - 阶段3：个人中心
+   - 阶段4：角色管理
+   - 阶段5：数据权限拦截器
+
+2. **各模块核心设计要点**：
+   - 认证登录：核心登录流程、密码错误锁定、JWT配置
+   - 用户管理：数据权限拦截器设计、用户查询优化
+   - 角色管理：角色分配逻辑
+   - 权限管理：权限注解和AOP设计
+   - 个人中心：修改密码流程
+
+3. **关键技术决策**：
+   - 决策1：权限存储策略（Token存roles，permissions查库+缓存）
+   - 决策2：数据权限实现（MyBatis-Plus拦截器自动过滤）
+   - 决策3：密码错误计数器（Redis缓存）
+
+4. **潜在风险和解决方案**：
+   - 风险1：N+1查询问题 → 批量查询解决方案
+   - 风险2：越权访问 → 数据权限拦截器 + Controller参数校验
+   - 风险3：密码泄露 → @JsonIgnore + 日志过滤
+
+5. **测试策略**：
+   - 单元测试示例
+   - 集成测试示例
+
+6. **核心建议总结**：
+   - 开发建议（优先级、分层开发、安全第一、性能优化）
+   - 代码质量（注释、异常处理、日志、文档）
+   - 安全检查清单（8项安全措施）
+
+**设计亮点**：
+- **分层开发**：每层完成后立即测试
+- **安全第一**：所有安全相关功能优先实现
+- **性能优化**：权限缓存、角色缓存、避免N+1查询
+- **风险防范**：提前识别风险并提供解决方案
+
+**相关文件**：
+- README.md（本文档，新增章节"开发思路与设计决策"）
+
+---
+
+### v1.0.4 (2026-01-07)
+
+#### 新增认证登录核心功能
+
+**更新人**：开发组
+
+**更新内容**：
+- ✅ 创建 PermissionService（权限查询服务）
+  - 根据角色ID列表查询权限代码
+  - 根据角色代码列表查询权限代码
+  - 支持权限验证和通配符匹配
+  - 权限去重和合并
+
+- ✅ 创建 PermissionServiceImpl（权限服务实现）
+  - 实现权限查询和验证逻辑
+  - 支持多角色权限合并
+  - 实现通配符权限支持（* 和 MODULE:*）
+  - 批量查询优化，避免N+1问题
+
+- ✅ 创建 AuthServiceImpl（认证服务实现）
+  - 用户登录：支持用户名/邮箱/手机号登录
+  - 密码验证：BCrypt加密验证
+  - 密码错误锁定：5次锁定30分钟（框架已实现）
+  - 密码过期检查：默认90天
+  - Token生成：JWT，7天有效期
+  - 角色和权限查询
+  - 数据权限范围构建
+  - 登录信息更新
+  - 用户登出
+  - Token刷新
+  - 修改密码
+  - 重置密码
+
+- ✅ 创建 AuthController（认证登录接口）
+  - POST /api/auth/login - 用户登录
+  - POST /api/auth/logout - 用户登出
+  - POST /api/auth/refresh - 刷新Token
+  - POST /api/auth/change-password - 修改密码
+  - POST /api/auth/reset-password/{id} - 重置密码（管理员）
+  - GET /api/auth/current - 获取当前用户信息
+
+- ✅ 创建 OperationModule 枚举（操作模块）
+  - AUTH（认证模块）
+  - USER（用户模块）
+  - ROLE（角色模块）
+
+- ✅ 扩展 UserRoleMapper
+  - 新增 selectRoleIdsByUserId 方法（查询用户角色ID列表）
+
+- ✅ 扩展 ResponseCode 枚举
+  - VALIDATION_ERROR（参数验证失败）
+  - USER_DISABLED（账户已禁用）
+  - USER_LOCKED（账户已锁定）
+  - PASSWORD_ERROR（密码错误）
+  - PASSWORD_EXPIRED（密码已过期）
+
+**设计要点**：
+1. **分层架构**：Controller → Service → Mapper，职责清晰
+2. **防御性编程**：完整的参数校验和异常处理
+3. **安全机制**：BCrypt加密、密码错误锁定、Token认证
+4. **性能优化**：批量查询，避免N+1问题
+5. **代码质量**：详细的注释，清晰的逻辑
+
+**依赖关系**：
+- PermissionService → RoleMapper, RolePermissionMapper, UserRoleMapper
+- AuthServiceImpl → UserMapper, UserRoleMapper, RoleMapper, PermissionService, PasswordEncoderUtil, JwtUtil
+- AuthController → AuthService
+
+**待完成功能**：
+- ⏳ Redis 缓存实现（密码错误计数器、权限缓存）
+- ⏳ 操作日志记录集成
+- ⏳ 密码错误计数器实现
+- ⏳ 图形验证码功能
+
+**相关文件**：
+- service/PermissionService.java（新建）
+- service/impl/PermissionServiceImpl.java（新建）
+- service/impl/AuthServiceImpl.java（新建）
+- controller/AuthController.java（新建）
+- enums/OperationModule.java（新建）
+- mapper/UserRoleMapper.java（已更新）
+- common/enums/ResponseCode.java（已更新）
+
+---
+
+### v1.0.5 (2026-01-07)
+
+#### 配置管理优化
+
+**更新人**：开发组
+
+**更新内容**：
+- ✅ 创建统一配置类 OrderPlatformProperties
+  - 位置：common/config/OrderPlatformProperties.java
+  - 集中管理所有业务配置（安全、JWT、缓存）
+  - 支持配置校验（@Min/@Max/@NotBlank）
+  - 类型安全的配置访问
+
+- ✅ 创建 application.yml 配置文件
+  - 位置：api/src/main/resources/application.yml（启动模块）
+  - 定义所有可配置项
+  - 支持环境变量覆盖（如 JWT_SECRET）
+
+- ✅ 重构 AuthServiceImpl
+  - 删除硬编码常量（MAX_PASSWORD_ATTEMPTS、LOCK_DURATION_MINUTES、PASSWORD_EXPIRE_DAYS）
+  - 使用 OrderPlatformProperties 读取配置
+  - 配置化的错误消息（"账户已锁定，请30分钟后再试" → "账户已锁定，请X分钟后再试"）
+
+**设计原则**：
+1. **集中配置**：所有配置集中在 common 模块
+2. **统一入口**：配置文件在启动模块（api）
+3. **类型安全**：使用 @ConfigurationProperties + JSR-303 校验
+4. **环境友好**：支持环境变量覆盖敏感配置
+
+**配置结构**：
+```yaml
+order:
+  platform:
+    security:
+      password:
+        max-attempts: 5
+        lock-minutes: 30
+        expire-days: 90
+    jwt:
+      secret: ${JWT_SECRET}
+      expiration: 604800
+    cache:
+      permission-ttl: 300
+```
+
+**优势**：
+- ✅ 无需修改代码即可调整配置
+- ✅ 不同环境使用不同配置（dev/test/prod）
+- ✅ 敏感配置通过环境变量注入
+- ✅ 配置集中管理，易于维护
+
+**相关文件**：
+- common/config/OrderPlatformProperties.java（新建）
+- api/src/main/resources/application.yml（新建，在启动模块）
+- user/service/impl/AuthServiceImpl.java（已重构）
+
+---
+
+#### API 启动模块创建
+
+**更新日期**：2026-01-07
+**更新人**：开发组
+
+**更新内容**：
+- ✅ 创建 order-platform-api 模块
+  - 位置：order-platform-api/
+  - 作用：Spring Boot 启动模块（主入口）
+  - 包含启动类 ApiApplication.java
+  - 包含统一配置文件 application.yml
+
+- ✅ 调整模块架构
+  - 移动配置文件从 user 模块到 api 模块
+  - 更新父 pom.xml，添加 api 模块声明
+  - 修复父 pom.xml 的配置错误（groupId、artifactId）
+
+**新模块结构**：
+```
+order-platform-api/
+├── pom.xml
+├── src/main/java/com/order/platform/api/
+│   └── ApiApplication.java          ✅ 启动类
+├── src/main/resources/
+│   └── application.yml               ✅ 统一配置文件
+└── src/test/java/
+```
+
+**依赖关系**：
+```
+api（启动模块）
+  ├─ user（业务模块）
+  │    └─ common（基础模块）
+  └─ common（基础模块）
+```
+
+**启动方式**：
+```bash
+# Maven 命令启动（在 api 模块目录下）
+mvn spring-boot:run
+
+# 或者在项目根目录
+cd order-platform-api
+mvn spring-boot:run
+```
+
+**访问地址**：
+- API 文档：http://localhost:8080/doc.html
+- 健康检查：http://localhost:8080/actuator/health
+
+**相关文件**：
+- order-platform-api/pom.xml（新建）
+- order-platform-api/src/main/java/com/order/platform/api/ApiApplication.java（新建）
+- order-platform-api/src/main/resources/application.yml（从 user 模块移动）
+- pom.xml（父 pom，已更新）
 
 ---
 

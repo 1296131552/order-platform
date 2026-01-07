@@ -22,6 +22,11 @@ public enum ResponseCode {
     USER_ALREADY_EXISTS(1003, "用户已存在"),
     TOKEN_INVALID(1004, "Token 无效"),
     TOKEN_EXPIRED(1005, "Token 已过期"),
+    VALIDATION_ERROR(1006, "参数验证失败"),
+    USER_DISABLED(1007, "账户已禁用"),
+    USER_LOCKED(1008, "账户已锁定"),
+    PASSWORD_ERROR(1009, "密码错误"),
+    PASSWORD_EXPIRED(1010, "密码已过期"),
 
     // 订单相关 2000-2999
     ORDER_NOT_FOUND(2001, "订单不存在"),

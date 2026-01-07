@@ -180,42 +180,210 @@
 
 | 接口 | 方法 | 路径 | 说明 | 认证 | 状态 |
 |------|------|------|------|------|------|
-| 用户登录 | POST | `/login` | 登录获取 Token | 否 | ⏳ |
-| 用户登出 | POST | `/logout` | 登出（删除 Token） | 是 | ⏳ |
-| 获取当前用户 | GET | `/user-info` | 获取当前登录用户信息 | 是 | ⏳ |
-| 刷新 Token | POST | `/refresh-token` | 刷新 Token 获取新 Token | 是 | ⏳ |
-| 修改密码 | PUT | `/change-password` | 修改当前用户密码 | 是 | ⏳ |
+| 用户登录 | POST | `/login` | 登录获取 Token | 否 | ✅ |
+| 用户登出 | POST | `/logout` | 登出（删除 Token） | 是 | ✅ |
+| 获取当前用户 | GET | `/current` | 获取当前登录用户信息 | 是 | ✅ |
+| 刷新 Token | POST | `/refresh` | 刷新 Token 获取新 Token | 是 | ✅ |
+| 修改密码 | POST | `/change-password` | 修改当前用户密码 | 是 | ✅ |
+| 重置密码 | POST | `/reset-password/{id}` | 管理员重置用户密码 | 是 | ✅ |
 
-#### 1.1 用户登录
+#### 1.1 用户登录 ✅
 
-**请求**：
+**接口**: `POST /api/auth/login`
+
+**说明**: 支持三种登录方式：用户名、邮箱、手机号
+
+**认证**: 否
+
+**请求参数**:
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| account | String | 是 | 账号（用户名/邮箱/手机号） |
+| password | String | 是 | 密码 |
+
+**请求示例**:
 ```http
 POST /api/auth/login
 Content-Type: application/json
 
 {
-  "username": "admin",
+  "account": "zhangsan",
   "password": "123456"
 }
 ```
 
-**响应**：
+**响应示例**:
 ```json
 {
   "code": 200,
-  "message": "登录成功",
+  "message": "操作成功",
   "data": {
-    "token": "eyJhbGciOiJIUzI1NiJ9...",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "tokenType": "Bearer",
+    "expiresIn": 604800,
     "userInfo": {
       "id": 1,
-      "username": "admin",
-      "realName": "管理员",
-      "email": "admin@example.com",
-      "roles": ["ADMIN"]
+      "username": "zhangsan",
+      "realName": "张三",
+      "email": "zhangsan@example.com",
+      "phone": "13800138000",
+      "status": "ACTIVE"
+    },
+    "roles": ["CUSTOMER_MANAGER"],
+    "permissions": ["ORDER:VIEW", "ORDER:CREATE"],
+    "dataScope": {
+      "scopeType": "ALL",
+      "orgIds": []
     }
   }
 }
 ```
+
+**业务规则**:
+- 密码错误 5 次锁定账户 30 分钟
+- Token 有效期 7 天（604800 秒）
+- 支持 BCrypt 加密
+
+#### 1.2 用户登出 ✅
+
+**接口**: `POST /api/auth/logout`
+
+**说明**: 用户退出登录，清除服务端 Token 缓存
+
+**认证**: 是
+
+**请求头**:
+```http
+Authorization: Bearer {token}
+```
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": null
+}
+```
+
+#### 1.3 获取当前用户信息 ✅
+
+**接口**: `GET /api/auth/current`
+
+**说明**: 根据Token获取当前登录用户信息，包含角色和权限
+
+**认证**: 是
+
+**请求头**:
+```http
+Authorization: Bearer {token}
+```
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "id": 1,
+    "username": "zhangsan",
+    "realName": "张三",
+    "email": "zhangsan@example.com",
+    "roles": ["CUSTOMER_MANAGER"],
+    "permissions": ["ORDER:VIEW", "ORDER:CREATE"]
+  }
+}
+```
+
+#### 1.4 刷新 Token ✅
+
+**接口**: `POST /api/auth/refresh`
+
+**说明**: 使用旧 Token 换取新 Token，重新查询权限
+
+**认证**: 是
+
+**请求头**:
+```http
+Authorization: Bearer {oldToken}
+```
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+#### 1.5 修改密码 ✅
+
+**接口**: `POST /api/auth/change-password`
+
+**说明**: 用户修改自己的密码，需要验证旧密码
+
+**认证**: 是
+
+**请求参数**:
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| oldPassword | String | 是 | 旧密码 |
+| newPassword | String | 是 | 新密码（6-20位，强度>=3） |
+| confirmPassword | String | 是 | 确认新密码 |
+
+**请求示例**:
+```http
+POST /api/auth/change-password
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "oldPassword": "123456",
+  "newPassword": "Abc123!@#",
+  "confirmPassword": "Abc123!@#"
+}
+```
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "密码修改成功",
+  "data": null
+}
+```
+
+#### 1.6 重置密码 ✅
+
+**接口**: `POST /api/auth/reset-password/{id}`
+
+**说明**: 管理员重置用户密码，生成 10 位随机密码
+
+**认证**: 是
+
+**权限**: 需要 USER:RESET 权限或系统管理员角色
+
+**路径参数**:
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| id | Long | 是 | 用户ID |
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "newPassword": "Abc123!@#xyZ"
+  }
+}
+```
+
+**注意**: 新密码仅在响应中返回一次，请妥善保存
 
 ---
 
@@ -577,19 +745,47 @@ Authorization: Bearer {token}
 
 ## 更新记录
 
-### v1.0.0 (2026-01-07)
+### v1.0.2 (2026-01-08)
+
+#### 修复内容
+- ✅ **登录功能优化**：修复操作日志字段问题
+  - 修复 `operatorId=-1` 问题（使用 SpEL 从返回值获取）
+  - 修复 `operatorName=系统` 问题（从返回值获取真实姓名）
+  - 修复 `operatorUserCode` 等字段为空问题
+  - 消除重复日志问题（统一由切面管理）
+- ✅ **API 文档配置**：新增 OpenAPI 配置类，支持 9 个 API 分组
+- ✅ **热重载功能**：集成 spring-boot-devtools，提高开发效率
+
+#### 实现详情
+- **OperationLogAspect**: 增强 SpEL 解析能力，支持从返回值获取完整用户信息
+- **@OperationLog 注解**: 新增 `operatorId`、`operatorName` 等属性
+- **OpenApiConfig**: 新增 API 分组配置（认证、用户、订单、发运等）
+
+#### 测试结果
+```
+operator_id=2, operator_name=张三, operator_user_code=USER002,
+operator_employee_no=EMP002, operator_position=客户经理 ✅
+```
+
+---
+
+### v1.0.1 (2026-01-07)
 
 #### 新增内容
+- ✅ 认证模块（6个接口）：用户登录、用户登出、获取当前用户、刷新Token、修改密码、重置密码
 
-- ✅ 创建 API 接口文档框架
-- ✅ 定义 RESTful 接口规范
-- ✅ 定义统一响应格式
-- ✅ 定义错误码规范
-- ✅ 定义 11 个功能模块的接口列表
+#### 实现详情
+- **AuthController**: `order-platform-user/src/main/java/com/order/platform/user/controller/AuthController.java`
+- **AuthService**: 认证服务实现，支持用户名/邮箱/手机号登录
+- **功能特性**:
+  - BCrypt 密码加密
+  - JWT Token 认证（7天有效期）
+  - 密码错误5次锁定账户30分钟
+  - Token 刷新机制
+  - 操作日志记录
+  - IP地址记录
 
 #### 待实现
-
-- ⏳ 认证模块（5个接口）
 - ⏳ 订单模块（10个接口）
 - ⏳ 订单行模块（9个接口）
 - ⏳ 发运模块（8个接口）
@@ -600,6 +796,18 @@ Authorization: Bearer {token}
 - ⏳ 角色权限模块（6个接口）
 - ⏳ 异常管理模块（6个接口）
 - ⏳ 附件模块（5个接口）
+
+---
+
+### v1.0.0 (2026-01-07)
+
+#### 新增内容
+
+- ✅ 创建 API 接口文档框架
+- ✅ 定义 RESTful 接口规范
+- ✅ 定义统一响应格式
+- ✅ 定义错误码规范
+- ✅ 定义 11 个功能模块的接口列表
 
 ---
 

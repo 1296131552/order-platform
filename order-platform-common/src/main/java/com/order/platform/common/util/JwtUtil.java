@@ -1,9 +1,10 @@
 package com.order.platform.common.util;
 
+import com.order.platform.common.config.OrderPlatformProperties;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
-import org.springframework.beans.factory.annotation.Value;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
@@ -20,11 +21,16 @@ import java.util.Map;
  * - 生成 JWT Token（支持用户信息、角色信息）
  * - 解析 Token 获取用户信息
  * - 验证 Token 有效性和过期时间
+ * - 配置从 OrderPlatformProperties 读取（配置优先规则）
  *
  * Token Claims 结构：
  * - userId: 用户ID
  * - username: 用户名
  * - roles: 角色代码列表（可选，用于混合方案的角色快照）
+ *
+ * 配置管理：
+ * - JWT 密钥：从 OrderPlatformProperties 读取
+ * - Token 过期时间：从 OrderPlatformProperties 读取
  *
  * 使用场景：
  * - 用户登录认证
@@ -32,13 +38,13 @@ import java.util.Map;
  * - 角色信息传递
  */
 @Component
+@RequiredArgsConstructor
 public class JwtUtil {
 
-    @Value("${jwt.secret}")
-    private String secret;
-
-    @Value("${jwt.expiration}")
-    private Long expiration;
+    /**
+     * 配置属性（从 application.yml 读取）
+     */
+    private final OrderPlatformProperties properties;
 
     /**
      * 生成 Token（基础版本，不含角色）
@@ -81,6 +87,10 @@ public class JwtUtil {
      * @return JWT Token
      */
     public String generateToken(Map<String, Object> claims) {
+        // 从配置读取 JWT 参数（配置优先规则）
+        String secret = properties.getJwt().getSecret();
+        Long expiration = properties.getJwt().getExpiration();
+
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + expiration);
 
@@ -100,12 +110,14 @@ public class JwtUtil {
      * @return Claims 对象
      */
     public Claims getClaimsFromToken(String token) {
+        // 从配置读取 JWT 密钥（配置优先规则）
+        String secret = properties.getJwt().getSecret();
         SecretKey key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
-        return Jwts.parserBuilder()
-                .setSigningKey(key)
+        return Jwts.parser()
+                .verifyWith(key)
                 .build()
-                .parseClaimsJws(token)
-                .getBody();
+                .parseSignedClaims(token)
+                .getPayload();
     }
 
     /**

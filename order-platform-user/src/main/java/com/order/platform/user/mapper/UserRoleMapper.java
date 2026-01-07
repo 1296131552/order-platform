@@ -37,4 +37,19 @@ public interface UserRoleMapper extends BaseMapper<UserRole> {
             "WHERE user_id = #{userId} " +
             "AND is_deleted = 0")
     List<String> selectRoleCodesByUserId(Long userId);
+
+    /**
+     * 查询用户的角色ID列表
+     *
+     * 查询条件：
+     * - 用户ID匹配
+     * - 未删除（is_deleted = 0）
+     *
+     * @param userId 用户ID
+     * @return 角色ID列表
+     */
+    @Select("SELECT role_id FROM t_user_role " +
+            "WHERE user_id = #{userId} " +
+            "AND is_deleted = 0")
+    List<Long> selectRoleIdsByUserId(Long userId);
 }

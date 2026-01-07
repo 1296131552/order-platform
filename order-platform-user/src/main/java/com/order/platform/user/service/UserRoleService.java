@@ -1,30 +1,37 @@
 package com.order.platform.user.service;
 
 import com.order.platform.common.provider.UserRoleProvider;
+import com.order.platform.user.entity.Role;
+import com.order.platform.user.mapper.RoleMapper;
+import com.order.platform.user.mapper.RolePermissionMapper;
 import com.order.platform.user.mapper.UserRoleMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
- * 用户角色服务
+ * 用户角色权限服务
  *
  * 功能说明：
  * - 查询用户的角色列表
+ * - 查询用户的权限列表
+ * - 获取用户的主角色和数据权限
  * - 实现 UserRoleProvider 接口，供 AuthInterceptor 调用
  * - 支持多级缓存策略（本地缓存 + Redis）
  * - 提供缓存刷新机制
  *
  * 缓存策略：
  * - 本地缓存（Caffeine）：5分钟过期，减少数据库查询
- * - 缓存键：user:roles:{userId}
+ * - 缓存键：user:roles:{userId}、user:permissions:{userId}
  * - 缓存刷新：角色变更时调用 clearCache 清除缓存
  *
  * 使用场景：
  * - AuthInterceptor 拦截器中查询用户角色
  * - 权限验证时获取用户角色列表
+ * - 登录时查询用户完整权限信息
  * - 角色管理相关业务
  *
  * @since 1.0.0
@@ -35,6 +42,8 @@ import java.util.List;
 public class UserRoleService implements UserRoleProvider {
 
     private final UserRoleMapper userRoleMapper;
+    private final RoleMapper roleMapper;
+    private final RolePermissionMapper rolePermissionMapper;
 
     /**
      * 查询用户的角色代码列表（带缓存）

@@ -17,21 +17,22 @@ import java.util.List;
  *
  * 使用示例：
  * <pre>
- * Page page = orderService.page(new Page(1, 10));
+ * Page<Order> page = orderService.page(new Page<>(1, 10));
  * return Result.success(PageResult.of(page));
  * </pre>
  *
+ * @param <T> 数据记录类型
  * @since 1.0.1
  */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class PageResult {
+public class PageResult<T> {
 
     /**
      * 数据列表
      */
-    private List records;
+    private List<T> records;
 
     /**
      * 总记录数

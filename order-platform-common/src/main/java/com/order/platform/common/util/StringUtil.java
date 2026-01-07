@@ -207,7 +207,7 @@ public class StringUtil {
      * @return 随机数字字符串
      */
     public static String randomNumeric(int length) {
-        return StrUtil.randomNumbers(length);
+        return cn.hutool.core.util.RandomUtil.randomNumbers(length);
     }
 
     /**
@@ -217,7 +217,7 @@ public class StringUtil {
      * @return 随机字母数字字符串
      */
     public static String randomString(int length) {
-        return StrUtil.randomString(length);
+        return cn.hutool.core.util.RandomUtil.randomString(length);
     }
 
     // ==================== 其他 ====================

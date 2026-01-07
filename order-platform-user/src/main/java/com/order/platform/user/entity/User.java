@@ -159,16 +159,16 @@ public class User {
     @TableField(fill = FieldFill.INSERT)
     private Long createdBy;
 
-    /**
+    /**  
      * 更新时间
      */
-    @TableField(fill = FieldFill.INSERT_UPDATE)
+    @TableField(fill = FieldFill.INSERT_UPDATE, updateStrategy = FieldStrategy.NOT_NULL)
     private LocalDateTime updatedAt;
 
     /**
      * 更新人ID
      */
-    @TableField(fill = FieldFill.INSERT_UPDATE)
+    @TableField(fill = FieldFill.INSERT_UPDATE, updateStrategy = FieldStrategy.NOT_NULL)
     private Long updatedBy;
 
     /**

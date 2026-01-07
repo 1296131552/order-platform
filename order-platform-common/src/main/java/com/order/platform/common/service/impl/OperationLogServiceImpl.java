@@ -40,10 +40,10 @@ public class OperationLogServiceImpl implements OperationLogService {
      */
     @Async("operationLogExecutor")
     @Override
-    public void saveAsync(OperationLogDTO log) {
+    public void saveAsync(OperationLogDTO logDTO) {
         try {
             // 1. DTO 转实体（使用 Hutool 的 BeanUtil）
-            OperationLog entity = BeanUtil.copyProperties(log, OperationLog.class);
+            OperationLog entity = BeanUtil.copyProperties(logDTO, OperationLog.class);
 
             // 2. 设置默认值
             if (entity.getOperationTime() == null) {
@@ -54,8 +54,8 @@ public class OperationLogServiceImpl implements OperationLogService {
             }
 
             // 3. 处理数据快照（暂时存入 extra_info）
-            if (StrUtil.isNotBlank(log.getBeforeData()) || StrUtil.isNotBlank(log.getAfterData())) {
-                String snapshot = buildSnapshotJson(log.getBeforeData(), log.getAfterData());
+            if (StrUtil.isNotBlank(logDTO.getBeforeData()) || StrUtil.isNotBlank(logDTO.getAfterData())) {
+                String snapshot = buildSnapshotJson(logDTO.getBeforeData(), logDTO.getAfterData());
                 entity.setExtraInfo(snapshot);
             }
 
@@ -68,7 +68,7 @@ public class OperationLogServiceImpl implements OperationLogService {
         } catch (Exception e) {
             // 日志保存失败不应影响业务流程，仅记录错误日志
             log.error("操作日志保存失败: operationType={}, businessType={}, error={}",
-                    log.getOperationType(), log.getBusinessType(), e.getMessage(), e);
+                    logDTO.getOperationType(), logDTO.getBusinessType(), e.getMessage(), e);
         }
     }
 

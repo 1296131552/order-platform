@@ -86,4 +86,35 @@ public @interface OperationLog {
      * 示例：#dto.customerName、#result.customerName
      */
     String businessName() default "";
+
+    /**
+     * 操作人ID表达式（SpEL）
+     * 用于登录/注册等无法从 CurrentUserHolder 获取用户的场景
+     * 示例：#result.data.userInfo.id
+     */
+    String operatorId() default "";
+
+    /**
+     * 操作人姓名表达式（SpEL）
+     * 示例：#result.data.userInfo.realName
+     */
+    String operatorName() default "";
+
+    /**
+     * 操作人用户编号表达式（SpEL）
+     * 示例：#result.data.userInfo.userCode
+     */
+    String operatorUserCode() default "";
+
+    /**
+     * 操作人工号表达式（SpEL）
+     * 示例：#result.data.userInfo.employeeNo
+     */
+    String operatorEmployeeNo() default "";
+
+    /**
+     * 操作人职位表达式（SpEL）
+     * 示例：#result.data.userInfo.position
+     */
+    String operatorPosition() default "";
 }

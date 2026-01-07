@@ -1,0 +1,157 @@
+# 订单可视化平台 - 应用配置文件
+#
+# 说明：
+# - 本配置文件包含所有业务模块的配置
+# - 开发环境默认配置
+# - 生产环境请使用环境变量覆盖敏感配置
+
+order:
+  platform:
+    # ==================== 安全配置 ====================
+    security:
+      # 密码策略
+      password:
+        # 密码错误最大尝试次数（默认：5次）
+        max-attempts: 5
+        # 账户锁定时长，单位：分钟（默认：30分钟）
+        lock-minutes: 30
+        # 密码过期天数（默认：90天）
+        expire-days: 90
+        # 密码最小长度（默认：6位）
+        min-length: 6
+        # 密码最大长度（默认：20位）
+        max-length: 20
+        # 密码最小强度得分：1-5（默认：3分）
+        # 1分：只有长度  |  2分：长度+1种字符  |  3分：长度+2种字符
+        # 4分：长度+3种字符  |  5分：长度+4种字符（大写、小写、数字、特殊字符）
+        min-strength: 3
+
+      # Token策略
+      token:
+        # Token过期时间，单位：秒（默认：604800秒 = 7天）
+        expiration: 604800
+
+    # ==================== JWT配置 ====================
+    jwt:
+      # JWT密钥（生产环境必须通过环境变量设置！）
+      # 开发环境默认值：dev-secret-key-do-not-use-in-production
+      # 生产环境：export JWT_SECRET=your-256-bit-secret-key
+      secret: ${JWT_SECRET:dev-secret-key-do-not-use-in-production-change-in-production}
+      # Token过期时间，单位：秒（默认：604800秒 = 7天）
+      expiration: 604800
+      # 刷新Token过期时间，单位：秒（默认：1209600秒 = 14天）
+      refresh-expiration: 1209600
+
+    # ==================== 缓存配置 ====================
+    cache:
+      # 权限缓存过期时间，单位：秒（默认：300秒 = 5分钟）
+      permission-ttl: 300
+      # 角色缓存过期时间，单位：秒（默认：300秒 = 5分钟）
+      role-ttl: 300
+      # 是否启用缓存（默认：true）
+      enabled: true
+
+# ==================== JWT配置（兼容性，与 order.platform.jwt 相同） ====================
+jwt:
+  secret: ${JWT_SECRET:dev-secret-key-do-not-use-in-production-change-in-production}
+  expiration: 604800
+
+# ==================== Spring Boot 配置 ====================
+spring:
+  application:
+    name: order-platform-api
+
+  # 数据源配置（开发环境）
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/opv-test1?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: root
+    password: w123456789
+
+  # Redis配置（开发环境）
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password:
+      database: 0
+      timeout: 3000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+
+  # ==================== DevTools 热重载配置 ====================
+  devtools:
+    # 启用热重载
+    enabled: true
+    # 排除不触发热重载的资源
+    exclude: static/**,public/**,templates/**
+    # 监控额外资源
+    additional-paths: src/main/java
+    # 禁用 LiveReload（可选，如需浏览器自动刷新则设为 true）
+    livereload:
+      enabled: false
+    # 重启策略
+    restart:
+      # 启用重启
+      enabled: true
+      # 排除不触发重启的资源（提高性能）
+      exclude: static/**,public/**,templates/**,META-INF/maven/**,META-INF/resources/**
+
+# ==================== MyBatis Plus 配置 ====================
+mybatis-plus:
+  configuration:
+    # 下划线转驼峰
+    map-underscore-to-camel-case: true
+    # 日志实现
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+  global-config:
+    db-config:
+      # 主键类型（AUTO：数据库自增）
+      id-type: auto
+      # 逻辑删除字段
+      logic-delete-field: isDeleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+# ==================== 日志配置 ====================
+logging:
+  level:
+    root: INFO
+    com.order.platform: DEBUG
+    org.springframework.security: DEBUG
+  pattern:
+    console: '%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n'
+
+# ==================== Knife4j API 文档配置 ====================
+springdoc:
+  api-docs:
+    # 启用 API 文档（JSON 格式）
+    enabled: true
+    # API 文档 JSON 路径（默认）
+    path: /v3/api-docs
+  swagger-ui:
+    # 启用 Swagger UI
+    enabled: true
+    # Swagger UI 路径
+    path: /swagger-ui.html
+
+# Knife4j 增强配置
+knife4j:
+  # 启用 Knife4j
+  enable: true
+  setting:
+    # 语言：中文
+    language: zh_cn
+    # 实体类列表名称
+    swagger-model-name: 实体类列表
+
+# ==================== 服务器配置 ====================
+server:
+  port: 8081
+  servlet:
+    context-path: /
+  tomcat:
+    uri-encoding: UTF-8

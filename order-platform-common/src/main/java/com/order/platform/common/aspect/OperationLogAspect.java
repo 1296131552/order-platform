@@ -1,5 +1,6 @@
 package com.order.platform.common.aspect;
 
+import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
 import com.order.platform.common.annotation.OperationLog;
 import com.order.platform.common.dto.CurrentUser;
@@ -44,16 +45,20 @@ import java.time.LocalDateTime;
  *
  * @since 1.0.0
  */
-@Slf4j
-@Aspect
-@Component
-@RequiredArgsConstructor
+@Slf4j      // 生成日志对象
+@Aspect     // 切面类
+@Component  // 将这个类纳入 Spring 容器管理，让 AOP 功能生效
+@RequiredArgsConstructor // 生成构造方法，注入OperationLogService
 public class OperationLogAspect {
 
     private final OperationLogService operationLogService;
 
     /**
      * SpEL 表达式解析器
+     * Spring Expression Language 的缩写，
+     * 翻译为「Spring 表达式语言」
+     * 在程序运行时，通过字符串形式的表达式，
+     * 动态获取 / 操作 Java 对象的属性、调用方法、执行逻辑判断等
      */
     private final ExpressionParser parser = new SpelExpressionParser();
 
@@ -152,6 +157,52 @@ public class OperationLogAspect {
 
         // 设置返回值到上下文
         context.setVariable("result", result);
+
+        // 解析 operatorId（优先级高于 CurrentUserHolder）
+        // 用于登录/注册等无法从 CurrentUserHolder 获取用户的场景
+        if (StrUtil.isNotBlank(operationLog.operatorId())) {
+            String operatorId = parseExpression(operationLog.operatorId(), context);
+            if (StrUtil.isNotBlank(operatorId)) {
+                try {
+                    logDTO.setOperatorId(Long.parseLong(operatorId));
+                    log.debug("从 SpEL 解析 operatorId: {}", operatorId);
+                } catch (NumberFormatException e) {
+                    log.warn("解析 operatorId 失败: {}", operatorId);
+                }
+            }
+        }
+
+        // 解析 operatorName
+        if (StrUtil.isNotBlank(operationLog.operatorName())) {
+            String operatorName = parseExpression(operationLog.operatorName(), context);
+            if (StrUtil.isNotBlank(operatorName)) {
+                logDTO.setOperatorName(operatorName);
+            }
+        }
+
+        // 解析 operatorUserCode
+        if (StrUtil.isNotBlank(operationLog.operatorUserCode())) {
+            String operatorUserCode = parseExpression(operationLog.operatorUserCode(), context);
+            if (StrUtil.isNotBlank(operatorUserCode)) {
+                logDTO.setOperatorUserCode(operatorUserCode);
+            }
+        }
+
+        // 解析 operatorEmployeeNo
+        if (StrUtil.isNotBlank(operationLog.operatorEmployeeNo())) {
+            String operatorEmployeeNo = parseExpression(operationLog.operatorEmployeeNo(), context);
+            if (StrUtil.isNotBlank(operatorEmployeeNo)) {
+                logDTO.setOperatorEmployeeNo(operatorEmployeeNo);
+            }
+        }
+
+        // 解析 operatorPosition
+        if (StrUtil.isNotBlank(operationLog.operatorPosition())) {
+            String operatorPosition = parseExpression(operationLog.operatorPosition(), context);
+            if (StrUtil.isNotBlank(operatorPosition)) {
+                logDTO.setOperatorPosition(operatorPosition);
+            }
+        }
 
         // 解析 businessId
         if (StrUtil.isNotBlank(operationLog.businessId())) {
