@@ -22,9 +22,10 @@ jobs:
     container:
       image: semgrep/semgrep
 
-    # 权限配置（仅读取代码）
+    # 权限配置（读取代码 + 创建 PR 评论）
     permissions:
       contents: read
+      pull-requests: write  # 允许创建/更新 PR 评论
 
     steps:
       - name: 📥 检出代码
@@ -51,6 +52,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      pull-requests: write
 
     steps:
       - name: 📥 检出代码
@@ -85,6 +87,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: [semgrep-scan, dependency-check]
     if: always()
+    permissions:
+      contents: read
+      pull-requests: write
 
     steps:
       - name: 📥 下载所有报告
@@ -98,17 +103,56 @@ jobs:
           echo "# 🔒 安全扫描总结报告" > summary.md
           echo "" >> summary.md
           echo "**扫描时间**: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> summary.md
-          echo "**提交**: ${{ github.sha }}" >> summary.md
+          echo "**提交**: \`${{ github.sha }}\`" >> summary.md
           echo "**分支**: ${{ github.ref_name }}" >> summary.md
           echo "" >> summary.md
-          echo "## 扫描结果" >> summary.md
-          echo "- ✅ Semgrep: 代码安全扫描已完成" >> summary.md
-          echo "- ✅ 依赖检查: 依赖漏洞扫描已完成" >> summary.md
+
+          # 解析 Semgrep 结果
+          if [ -f "reports/semgrep-results/semgrep.json" ]; then
+            echo "## 🕵️ Semgrep 代码安全扫描" >> summary.md
+            echo "" >> summary.md
+
+            # 使用 jq 解析 JSON（如果可用）
+            if command -v jq &> /dev/null; then
+              RESULTS=$(jq -r '.results | length' reports/semgrep-results/semgrep.json 2>/dev/null || echo "0")
+
+              if [ "$RESULTS" -eq 0 ]; then
+                echo "✅ **未发现安全问题**" >> summary.md
+              else
+                echo "⚠️ **发现 $RESULTS 个潜在问题**" >> summary.md
+                echo "" >> summary.md
+
+                # 显示前10个问题
+                echo '<details>' >> summary.md
+                echo '<summary>🔍 点击查看详细结果（前10个）</summary>' >> summary.md
+                echo "" >> summary.md
+                echo '```' >> summary.md
+                jq -r '.results[:10] | .[] | "\(.message | .[0].text)\n  文件: \(.path):\(.start.line)\n  严重程度: \(.extra.severity // "未知")\n"' reports/semgrep-results/semgrep.json >> summary.md 2>/dev/null || echo "解析失败" >> summary.md
+                echo '```' >> summary.md
+                echo '</details>' >> summary.md
+              fi
+            else
+              echo "✅ Semgrep 扫描已完成（详细结果请查看 Artifacts）" >> summary.md
+            fi
+            echo "" >> summary.md
+          else
+            echo "## 🕵️ Semgrep 代码安全扫描" >> summary.md
+          fi
+
+          # 依赖检查总结
+          echo "## 📦 依赖漏洞扫描" >> summary.md
+          echo "✅ OWASP Dependency Check 扫描已完成" >> summary.md
           echo "" >> summary.md
-          echo "## 报告下载" >> summary.md
-          echo "请查看本次运行的 Artifacts 获取详细报告。" >> summary.md
+
+          echo "## 📥 获取详细报告" >> summary.md
+          echo "请在 GitHub Actions 运行页面下载以下 Artifacts：" >> summary.md
+          echo "- \`semgrep-results\` - Semgrep JSON 格式结果" >> summary.md
+          echo "- \`dependency-check-report\` - HTML 格式依赖报告" >> summary.md
           echo "" >> summary.md
-          echo "**注意**：这是社区版安全扫描，功能有限。如需完整功能，请配置 SEMGREP_APP_TOKEN。" >> summary.md
+
+          echo "---" >> summary.md
+          echo "" >> summary.md
+          echo "**💡 提示**: 这是社区版 Semgrep，功能有限。如需完整功能，请配置 \`SEMGREP_APP_TOKEN\`。" >> summary.md
 
       - name: 📝 上传总结报告
         uses: actions/upload-artifact@v4
