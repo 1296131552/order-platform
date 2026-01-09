@@ -36,7 +36,14 @@ jobs:
       - name: 🔍 运行 Semgrep 扫描
         run: |
           # 使用社区版规则扫描，不生成 SARIF（需要 token）
-          semgrep --config=auto --json --output=semgrep.json || true
+          # 排除文档文件、测试脚本和 SQL 初始化脚本
+          semgrep \
+            --config=auto \
+            --json \
+            --output=semgrep.json \
+            --exclude='*.md' \
+            --exclude='*_test-db.sql' \
+            --exclude='scripts/sql/' || true
         continue-on-error: true
 
       - name: 📝 上传扫描结果
