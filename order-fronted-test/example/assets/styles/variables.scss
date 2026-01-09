@@ -1,0 +1,104 @@
+/**
+ * SCSS 全局样式变量
+ * 统一管理颜色、字体、间距等变量
+ */
+
+// ==================== 颜色变量 ====================
+
+// 主色
+$primary-color: #409eff;
+$success-color: #67c23a;
+$warning-color: #e6a23c;
+$danger-color: #f56c6c;
+$info-color: #909399;
+
+// 文字颜色
+$text-color-primary: #303133;
+$text-color-regular: #606266;
+$text-color-secondary: #909399;
+$text-color-placeholder: #c0c4cc;
+
+// 边框颜色
+$border-color: #dcdfe6;
+$border-color-light: #e4e7ed;
+$border-color-lighter: #ebeef5;
+$border-color-extra-light: #f2f6fc;
+
+// 背景颜色
+$bg-color: #f5f5f5;
+$bg-color-page: #ffffff;
+
+// ==================== 字体变量 ====================
+
+$font-size-base: 14px;
+$font-size-small: 12px;
+$font-size-large: 16px;
+
+$font-family: "Helvetica Neue", Helvetica, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", Arial, sans-serif;
+
+// ==================== 间距变量 ====================
+
+$spacing-xs: 4px;
+$spacing-sm: 8px;
+$spacing-md: 12px;
+$spacing-lg: 16px;
+$spacing-xl: 20px;
+$spacing-xxl: 32px;
+
+// ==================== 圆角变量 ====================
+
+$border-radius-base: 4px;
+$border-radius-small: 2px;
+$border-radius-large: 8px;
+$border-radius-circle: 50%;
+
+// ==================== 阴影变量 ====================
+
+$box-shadow-base: 0 2px 4px rgba(0, 0, 0, 0.12), 0 0 6px rgba(0, 0, 0, 0.04);
+$box-shadow-dark: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+$box-shadow-light: 0 2px 8px rgba(0, 0, 0, 0.08);
+
+// ==================== 状态颜色 ====================
+
+// 订单状态
+$status-order-draft: #909399;
+$status-order-confirmed: #409eff;
+$status-order-executing: #e6a23c;
+$status-order-partial-received: #f56c6c;
+$status-order-completed: #67c23a;
+$status-order-cancelled: #909399;
+
+// 发运状态
+$status-shipment-draft: #909399;
+$status-shipment-approved: #67c23a;
+$status-shipment-executing: #e6a23c;
+$status-shipment-completed: #409eff;
+
+// 签收状态
+$status-receipt-pending: #e6a23c;
+$status-receipt-received: #67c23a;
+$status-receipt-difference: #f56c6c;
+
+// 异常状态
+$status-exception-pending: #f56c6c;
+$status-exception-processing: #e6a23c;
+$status-exception-resolved: #67c23a;
+$status-exception-closed: #909399;
+
+// ==================== 布局变量 ====================
+
+$header-height: 60px;
+$sidebar-width: 200px;
+$sidebar-collapsed-width: 64px;
+$tabbar-height: 40px;
+
+// ==================== Z-index 层级 ====================
+
+$z-index-normal: 1;
+$z-index-dropdown: 10;
+$z-index-sticky: 20;
+$z-index-fixed: 30;
+$z-index-modal-mask: 40;
+$z-index-modal: 50;
+$z-index-popover: 60;
+$z-index-tooltip: 70;

@@ -113,6 +113,58 @@ public class User {
     private Integer loginCount;
 
     /**
+     * 首次登录标记：0-否，1-是
+     *
+     * 用途说明：
+     * - 用于实现首次登录强制改密功能
+     * - 创建用户时设置为 1
+     * - 首次改密后设置为 0
+     *
+     * @since 1.0.1
+     */
+    private Integer isFirstLogin;
+
+    /**
+     * 审核状态
+     *
+     * 枚举值：
+     * - NONE：无需审核（管理员创建的用户）
+     * - PENDING：待审核（自主注册的用户）
+     * - APPROVED：已通过
+     * - REJECTED：已拒绝
+     *
+     * @since 1.0.1
+     */
+    private String auditStatus;
+
+    /**
+     * 审核备注
+     *
+     * 用途：记录审核时的备注信息
+     *
+     * @since 1.0.1
+     */
+    private String auditRemark;
+
+    /**
+     * 审核人ID
+     *
+     * 用途：记录审核操作人的用户ID
+     *
+     * @since 1.0.1
+     */
+    private Long auditBy;
+
+    /**
+     * 审核时间
+     *
+     * 用途：记录审核操作的时间
+     *
+     * @since 1.0.1
+     */
+    private LocalDateTime auditTime;
+
+    /**
      * 密码修改时间
      */
     private LocalDateTime passwordChangedTime;

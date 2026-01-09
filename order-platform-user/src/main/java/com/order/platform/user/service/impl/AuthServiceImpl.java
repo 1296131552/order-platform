@@ -94,30 +94,57 @@ public class AuthServiceImpl implements AuthService {
         // 3. 验证用户状态（启用、锁定）
         validateUserStatus(user);
 
-        // 4. 验证密码（BCrypt）
+        // 4. 验证用户审核状态（自主注册用户需要审核通过后才能登录）
+        // TODO(human): 实现用户审核状态检查逻辑
+        //
+        // 背景：自主注册的用户需要经过管理员审核后才能登录系统
+        //       邀请码注册的用户（audit_status=NONE）可以直接登录
+        //       我们需要根据用户的审核状态决定是否允许登录
+        //
+        // 您的任务：实现以下逻辑
+        // 1. 获取用户审核状态：String auditStatus = user.getAuditStatus()
+        // 2. 检查审核状态，根据不同情况处理：
+        //    - 如果是 "PENDING"（待审核）：抛出异常，提示"账号正在审核中，请耐心等待或联系管理员"
+        //    - 如果是 "REJECTED"（已拒绝）：抛出异常，提示"账号审核未通过，如需帮助请联系管理员"
+        //    - 如果是 "APPROVED"（已通过）或 "NONE"（无需审核）：继续登录流程
+        //
+        // 提示：
+        // - 使用 UserAuditStatus 枚举类中的常量：UserAuditStatus.PENDING.name()
+        // - 抛出业务异常：throw new BusinessException(ResponseCode.USER_AUDIT_PENDING)
+        // - 需要在 ResponseCode 中添加错误码：
+        //   - USER_AUDIT_PENDING(1021, "账号正在审核中，请耐心等待或联系管理员")
+        //   - USER_AUDIT_REJECTED(1022, "账号审核未通过，如需帮助请联系管理员")
+        //
+        // 示例代码结构（请完善）：
+        // String auditStatus = user.getAuditStatus();
+        // if (UserAuditStatus.PENDING.name().equals(auditStatus)) {
+        //     throw new BusinessException(ResponseCode.USER_AUDIT_PENDING);
+        // }
+
+        // 5. 验证密码（BCrypt）
         validatePassword(user, loginDTO.getPassword());
 
-        // 5. 检查密码过期
+        // 6. 检查密码过期
         validatePasswordExpiration(user);
 
-        // 6. 查询用户角色和权限
+        // 7. 查询用户角色和权限
         List<Long> roleIds = userRoleMapper.selectRoleIdsByUserId(user.getId());
         List<String> roleCodes = userRoleMapper.selectRoleCodesByUserId(user.getId());
         List<String> permissions = permissionService.getPermissionsByRoleIds(roleIds);
 
-        // 7. 查询数据权限范围（从主角色）
+        // 8. 查询数据权限范围（从主角色）
         LoginVO.DataScopeInfo dataScope = buildDataScope(user, roleIds);
 
-        // 8. 生成JWT Token（包含角色信息）
+        // 9. 生成JWT Token（包含角色信息）
         String token = jwtUtil.generateToken(user.getId(), user.getUsername(), roleCodes);
 
-        // 9. 更新登录信息
+        // 10. 更新登录信息
         updateLoginInfo(user.getId());
 
-        // 10. 清除密码错误计数器（如果存在）
+        // 11. 清除密码错误计数器（如果存在）
         clearPasswordErrorAttempts(user.getId());
 
-        // 11. 构建登录响应
+        // 12. 构建登录响应
         return buildLoginVO(token, user, roleCodes, permissions, dataScope);
     }
 
@@ -238,6 +265,28 @@ public class AuthServiceImpl implements AuthService {
         user.setPassword(encryptedPassword);
         user.setPasswordChangedTime(LocalDateTime.now());
         user.setPasswordExpireTime(LocalDateTime.now().plusDays(properties.getSecurity().getPassword().getExpireDays()));
+
+        // TODO(human): 实现首次登录标记清除逻辑
+        //
+        // 背景：当用户首次登录后修改密码，需要清除首次登录标记
+        //       这样用户下次登录时就不会再看到"需要修改密码"的提示
+        //
+        // 您的任务：实现以下逻辑
+        // 1. 检查 user.getIsFirstLogin() 是否为 1（首次登录）
+        // 2. 如果是首次登录，将 user.isFirstLogin 设置为 0
+        // 3. 同时更新 user.passwordChangedTime（已在上面设置）
+        //
+        // 提示：
+        // - 只有首次登录的用户才需要清除标记（避免误操作）
+        // - 清除标记后，用户再次登录时不会强制改密
+        // - 使用 user.setIsFirstLogin(0) 清除标记
+        //
+        // 示例代码结构（请完善）：
+        // if (user.getIsFirstLogin() != null && user.getIsFirstLogin() == 1) {
+        //     user.setIsFirstLogin(0);
+        //     log.info("清除用户首次登录标记: userId={}", userId);
+        // }
+
         userMapper.updateById(user);
 
         // 9. 记录操作日志
@@ -662,15 +711,55 @@ public class AuthServiceImpl implements AuthService {
 
     /**
      * 构建登录响应VO
+     *
+     * 功能说明：
+     * - 封装登录成功后的完整响应信息
+     * - 包含Token、用户信息、角色权限、数据权限
+     * - 支持首次登录强制改密功能
+     *
+     * @since 1.0.0
      */
     private LoginVO buildLoginVO(String token, User user, List<String> roles,
                                  List<String> permissions, LoginVO.DataScopeInfo dataScope) {
         CurrentUserDTO currentUser = authHelper.toCurrentUserDTO(user, roles);
 
+        // TODO(human): 实现首次登录检测逻辑
+        //
+        // 背景：当用户首次登录时，需要强制用户修改密码
+        //       我们需要从 User 对象中提取首次登录标记，并在 LoginVO 中设置对应的改密提示
+        //
+        // 您的任务：实现以下逻辑
+        // 1. 检查 user.getIsFirstLogin() 是否为 1（首次登录）
+        // 2. 如果是首次登录，设置 requireChangePassword = true
+        // 3. 设置 passwordExpireTime = user.getPasswordExpireTime()
+        // 4. 可选：如果密码已过期，也需要设置 requireChangePassword = true
+        //
+        // 提示：
+        // - isFirstLogin 字段：1 表示首次登录，0 表示非首次登录
+        // - requireChangePassword：前端会根据此字段判断是否弹出改密对话框
+        // - 密码过期检查：user.getPasswordExpireTime() != null && user.getPasswordExpireTime().isBefore(LocalDateTime.now())
+        //
+        // 示例代码结构（请完善）：
+        // boolean requireChangePassword = false;
+        // if (user.getIsFirstLogin() != null && user.getIsFirstLogin() == 1) {
+        //     requireChangePassword = true;
+        // }
+        // // 可选：检查密码是否过期
+        // if (user.getPasswordExpireTime() != null &&
+        //     user.getPasswordExpireTime().isBefore(LocalDateTime.now())) {
+        //     requireChangePassword = true;
+        // }
+
+        // 临时默认值（等您实现后会替换为实际逻辑）
+        boolean requireChangePassword = false;
+        LocalDateTime passwordExpireTime = user.getPasswordExpireTime();
+
         return LoginVO.builder()
             .token(token)
             .tokenType("Bearer")
             .expiresIn(properties.getJwt().getExpiration())
+            .requireChangePassword(requireChangePassword)
+            .passwordExpireTime(passwordExpireTime)
             .userInfo(currentUser)
             .roles(roles)
             .permissions(permissions)

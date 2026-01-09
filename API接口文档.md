@@ -24,8 +24,8 @@
 | **项目名称** | 订单可视化数字化管理平台 |
 | **当前版本** | v1.0.0 |
 | **基础 URL** | `http://localhost:8080` |
-| **文档版本** | v1.0.0 |
-| **最后更新** | 2026-01-07 |
+| **文档版本** | v1.0.1 |
+| **最后更新** | 2026-01-09 |
 
 ---
 
@@ -181,11 +181,14 @@
 | 接口 | 方法 | 路径 | 说明 | 认证 | 状态 |
 |------|------|------|------|------|------|
 | 用户登录 | POST | `/login` | 登录获取 Token | 否 | ✅ |
+| 用户注册 | POST | `/register` | 用户注册（需邀请码） | 否 | ⏳ |
 | 用户登出 | POST | `/logout` | 登出（删除 Token） | 是 | ✅ |
 | 获取当前用户 | GET | `/current` | 获取当前登录用户信息 | 是 | ✅ |
 | 刷新 Token | POST | `/refresh` | 刷新 Token 获取新 Token | 是 | ✅ |
 | 修改密码 | POST | `/change-password` | 修改当前用户密码 | 是 | ✅ |
 | 重置密码 | POST | `/reset-password/{id}` | 管理员重置用户密码 | 是 | ✅ |
+| 生成邀请码 | POST | `/invite-code/generate` | 生成用户注册邀请码 | 是 | ⏳ |
+| 查询我的邀请码 | GET | `/invite-code/my` | 查询我生成的邀请码列表 | 是 | ⏳ |
 
 #### 1.1 用户登录 ✅
 
@@ -267,7 +270,262 @@ Authorization: Bearer {token}
 }
 ```
 
-#### 1.3 获取当前用户信息 ✅
+#### 1.3 用户注册 ⏳
+
+**接口**: `POST /api/auth/register`
+
+**说明**: 使用邀请码注册新用户账号
+
+**认证**: 否
+
+**业务背景**:
+- 本系统为后台管理平台，采用邀请制注册模式
+- 只有持有有效邀请码的用户才能注册
+- 邀请码由现有用户生成，确保新用户可信
+- 注册成功后自动通过审核，无需人工审核
+
+**请求参数**:
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| username | String | 是 | 用户名（2-20字符，字母开头，只含字母数字下划线） |
+| password | String | 是 | 初始密码（6-20字符） |
+| realName | String | 是 | 真实姓名（2-20字符） |
+| inviteCode | String | 是 | 邀请码（8位大写字母数字） |
+| email | String | 否 | 邮箱（需符合邮箱格式，全局唯一） |
+| phone | String | 否 | 手机号（11位数字，1开头，全局唯一） |
+| departmentId | Long | 否 | 部门ID（-1表示未分配部门） |
+| position | String | 否 | 职位 |
+| employeeNo | String | 否 | 工号 |
+| remark | String | 否 | 用户备注（最多500字符） |
+
+**字段验证规则**:
+- `username`:
+  - 长度：2-20字符
+  - 格式：字母开头，只能包含字母、数字、下划线
+  - 唯一性：全局唯一（包括已删除用户）
+- `password`:
+  - 长度：6-20字符
+  - 强度：不能与用户名相同
+- `email`:
+  - 格式：标准邮箱格式
+  - 唯一性：全局唯一（包括已删除用户）
+- `phone`:
+  - 格式：11位数字，1开头（1[3-9]xxxxxxxxx）
+  - 唯一性：全局唯一（包括已删除用户）
+
+**请求示例**:
+```http
+POST /api/auth/register
+Content-Type: application/json
+
+{
+  "username": "lisi",
+  "password": "Abc123456",
+  "realName": "李四",
+  "inviteCode": "ABC12345",
+  "email": "lisi@company.com",
+  "phone": "13900139000",
+  "departmentId": 10,
+  "position": "客户经理",
+  "employeeNo": "EMP002",
+  "remark": "华东区域客户经理"
+}
+```
+
+**响应示例（成功）**:
+```json
+{
+  "code": 200,
+  "message": "注册成功",
+  "data": {
+    "userId": 123,
+    "username": "lisi",
+    "realName": "李四",
+    "auditStatus": "APPROVED",
+    "message": "注册成功，请使用用户名和密码登录"
+  },
+  "timestamp": "2026-01-09T12:00:00"
+}
+```
+
+**错误响应示例**:
+```json
+{
+  "code": 1013,
+  "message": "用户名已存在",
+  "data": null,
+  "timestamp": "2026-01-09T12:00:00"
+}
+```
+
+```json
+{
+  "code": 400,
+  "message": "邀请码无效或已过期",
+  "data": null,
+  "timestamp": "2026-01-09T12:00:00"
+}
+```
+
+**业务规则**:
+1. **邀请码验证**:
+   - 邀请码必须存在且在有效期内
+   - 邀请码使用次数不能超过限制（默认1次）
+   - 邀请码使用后次数+1
+
+2. **唯一性检查**:
+   - 用户名、邮箱、手机号必须全局唯一
+   - 支持逻辑删除后的用户名重复使用
+
+3. **审核状态**:
+   - 使用邀请码注册：`audit_status = APPROVED`（自动通过）
+   - 管理员创建用户：`audit_status = NONE`（无需审核）
+   - 首次登录标记：`is_first_login = 0`（用户已设置密码）
+
+4. **角色分配**:
+   - 自动分配默认角色：`CUSTOMER_MANAGER`
+   - 管理员可在注册后调整角色
+
+5. **数据完整性**:
+   - 自动记录邀请人ID（`inviter_id`）
+   - 自动设置创建时间和创建人
+
+**相关错误码**:
+| 错误码 | 说明 |
+|--------|------|
+| 1013 | 用户名已存在 |
+| 1011 | 邮箱已存在 |
+| 1012 | 手机号已存在 |
+| 400 | 邀请码无效或已过期 |
+| 400 | 邀请码已达使用上限 |
+| 400 | 参数验证失败 |
+
+**安全说明**:
+- 密码使用BCrypt加密存储（strength=10）
+- 邀请码一次性使用，防止滥用
+- 支持防止恶意注册的频率限制（建议）
+
+#### 1.4 生成邀请码 ⏳
+
+**接口**: `POST /api/auth/invite-code/generate`
+
+**说明**: 生成用户注册邀请码
+
+**认证**: 是
+
+**权限**: 需要登录用户
+
+**请求参数**:
+
+| 参数 | 类型 | 必填 | 默认值 | 说明 |
+|------|------|------|--------|------|
+| maxUses | Integer | 否 | 1 | 最大使用次数（1-10） |
+| expireDays | Integer | 否 | 30 | 有效期（天，1-365） |
+
+**请求示例**:
+```http
+POST /api/auth/invite-code/generate
+Content-Type: application/json
+Authorization: Bearer {token}
+
+{
+  "maxUses": 5,
+  "expireDays": 30
+}
+```
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "邀请码生成成功",
+  "data": {
+    "code": "ABC12345",
+    "maxUses": 5,
+    "usedCount": 0,
+    "expireAt": "2026-02-08T12:00:00",
+    "qrCodeUrl": "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=ABC12345"
+  },
+  "timestamp": "2026-01-09T12:00:00"
+}
+```
+
+**业务规则**:
+1. **邀请码格式**:
+   - 8位大写字母数字组合
+   - 随机生成，确保唯一性
+
+2. **使用限制**:
+   - 每个邀请码可使用1-10次
+   - 使用次数达到上限后自动失效
+
+3. **有效期**:
+   - 默认30天
+   - 可配置1-365天
+   - 过期后自动失效
+
+4. **追溯性**:
+   - 记录邀请人ID（`inviter_id`）
+   - 可查询某邀请码邀请的所有用户
+
+#### 1.5 查询我的邀请码列表 ⏳
+
+**接口**: `GET /api/auth/invite-code/my`
+
+**说明**: 查询当前用户生成的所有邀请码
+
+**认证**: 是
+
+**权限**: 需要登录用户
+
+**请求参数**:
+
+| 参数 | 类型 | 必填 | 默认值 | 说明 |
+|------|------|------|--------|------|
+| page | Integer | 否 | 1 | 页码 |
+| pageSize | Integer | 否 | 10 | 每页大小 |
+| status | String | 否 | - | 状态过滤（active/expired/used） |
+
+**请求示例**:
+```http
+GET /api/auth/invite-code/my?page=1&pageSize=10&status=active
+Authorization: Bearer {token}
+```
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "records": [
+      {
+        "code": "ABC12345",
+        "maxUses": 5,
+        "usedCount": 2,
+        "expireAt": "2026-02-08T12:00:00",
+        "status": "active",
+        "createdAt": "2026-01-09T10:00:00"
+      }
+    ],
+    "total": 10,
+    "size": 10,
+    "current": 1,
+    "pages": 1
+  },
+  "timestamp": "2026-01-09T12:00:00"
+}
+```
+
+**状态说明**:
+- `active`: 有效期内且未达到使用上限
+- `expired`: 已过期
+- `used`: 已达到使用上限
+
+---
+
+#### 1.6 获取当前用户信息 ✅
 
 **接口**: `GET /api/auth/current`
 

@@ -8,6 +8,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -17,11 +18,14 @@ import java.util.List;
  * - 返回完整的用户信息和权限信息
  * - 返回JWT Token及有效期
  * - 返回数据权限范围
+ * - 支持首次登录强制改密功能
  *
  * 字段说明：
  * - token：JWT访问令牌
  * - tokenType：令牌类型（Bearer）
  * - expiresIn：过期时间（秒）
+ * - requireChangePassword：是否需要修改密码（首次登录或密码过期）
+ * - passwordExpireTime：密码过期时间
  * - userInfo：当前用户信息
  * - roles：用户角色列表
  * - permissions：用户权限列表
@@ -38,6 +42,7 @@ import java.util.List;
  * - 每次请求在Header中携带：Authorization: Bearer {token}
  * - Token过期后需要重新登录或刷新Token
  * - 敏感信息（如密码）不返回给前端
+ * - 首次登录用户需要修改密码（requireChangePassword=true）
  *
  * @since 1.0.0
  */
@@ -88,6 +93,43 @@ public class LoginVO implements Serializable {
      */
     @Schema(description = "过期时间（秒）", example = "604800")
     private Long expiresIn;
+
+    /**
+     * 是否需要修改密码
+     *
+     * 说明：
+     * - true：需要修改密码（首次登录或密码已过期）
+     * - false：无需修改密码
+     *
+     * 使用场景：
+     * - 首次登录强制改密（is_first_login=1）
+     * - 密码过期提醒（password_expire_time < 当前时间）
+     *
+     * 前端处理：
+     * - 当requireChangePassword=true时，应弹出改密对话框
+     * - 强制用户修改密码后才能继续操作
+     *
+     * @since 1.0.1
+     */
+    @Schema(description = "是否需要修改密码", example = "false")
+    private Boolean requireChangePassword;
+
+    /**
+     * 密码过期时间
+     *
+     * 说明：
+     * - 密码的过期时间点
+     * - null：密码永不过期
+     * - 非null：在此时间后需要修改密码
+     *
+     * 使用场景：
+     * - 前端可以提前提醒用户密码即将过期
+     * - 结合requireChangePassword实现密码过期策略
+     *
+     * @since 1.0.1
+     */
+    @Schema(description = "密码过期时间", example = "2026-07-09T12:00:00")
+    private LocalDateTime passwordExpireTime;
 
     /**
      * 当前用户信息

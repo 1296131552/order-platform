@@ -29,6 +29,10 @@ public enum ResponseCode {
     PASSWORD_EXPIRED(1010, "密码已过期"),
     EMAIL_ALREADY_EXISTS(1011, "邮箱已存在"),
     PHONE_ALREADY_EXISTS(1012, "手机号已存在"),
+    USERNAME_ALREADY_EXISTS(1013, "用户名已存在"),
+    USER_AUDIT_PENDING(1021, "账号正在审核中，请耐心等待或联系管理员"),
+    USER_AUDIT_REJECTED(1022, "账号审核未通过，如需帮助请联系管理员"),
+    USER_NO_ROLE(1023, "账号未分配角色，请联系管理员"),
 
     // 订单相关 2000-2999
     ORDER_NOT_FOUND(2001, "订单不存在"),
