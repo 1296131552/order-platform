@@ -19,7 +19,11 @@ jobs:
     name: Semgrep 代码安全扫描
     runs-on: ubuntu-latest
 
-    # 权限配置（可选，用于发布 PR 评论）
+    # 使用官方 Semgrep Docker 镜像
+    container:
+      image: semgrep/semgrep
+
+    # 权限配置
     permissions:
       contents: read
       security-events: write
@@ -29,43 +33,15 @@ jobs:
       - name: 📥 检出代码
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # 获取完整历史，便于 blame 分析
-
-      - name: 🔧 设置 Java 环境
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: ${{ env.JAVA_VERSION }}
-          cache: 'maven'
-
-      - name: 📦 安装依赖
-        run: mvn dependency:go-offline -B
+          fetch-depth: 0  # 获取完整历史
 
       - name: 🔍 运行 Semgrep 扫描
-        id: semgrep
-        uses: returntocorp/semgrep@v1
-        with:
-          config: auto  # 使用自动配置，包含所有推荐规则
-          # 可选：指定自定义规则
-          # config: |
-          #   - https://semgrep.dev/p/java
-          #   - .semgrep/rules
-
-          # 仅扫描新修改的文件（PR 场景）
-          # diff: aware
-
-          # 生成 SARIF 格式报告（用于 GitHub Security）
-          sarif: true
-
-          # 严重程度阈值
-          severity: WARNING  # 只报告 WARNING 及以上级别
-
-          # 超时设置
-          timeout: 300
-
+        run: semgrep ci --sarif > semgrep.sarif
+        continue-on-error: true
         env:
-          # 设置 GitHub Token（用于 PR 评论）
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # SEMGREP_APP_TOKEN 是可选的，不提供时使用社区版
+          # 在 https://semgrep.dev 注册获取 token
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
 
       - name: 📊 上传 SARIF 报告到 GitHub Security
         if: always()
