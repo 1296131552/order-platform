@@ -22,24 +22,38 @@
         v-model:page="page"
         v-model:page-size="pageSize"
       >
-        <el-table-column prop="code" label="供应商编码" width="140" />
+        <el-table-column prop="supplierNo" label="供应商编码" width="140" />
         <el-table-column prop="name" label="供应商名称" min-width="180" />
         <el-table-column prop="contactPerson" label="联系人" width="120" />
         <el-table-column prop="contactPhone" label="联系电话" width="140" />
         <el-table-column prop="address" label="地址" min-width="200" show-overflow-tooltip />
         <el-table-column prop="status" label="状态" width="100" align="center">
           <template #default="{ row }">
-            <el-tag :type="row.status === 'active' ? 'success' : 'info'">
-              {{ row.status === 'active' ? '启用' : '停用' }}
+            <el-tag :type="row.status === 'ACTIVE' ? 'success' : 'info'">
+              {{ row.status === 'ACTIVE' ? '启用' : '停用' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="createTime" label="创建时间" width="160" />
-        <el-table-column label="操作" width="220" fixed="right">
+        <el-table-column prop="createdAt" label="创建时间" width="160" />
+        <el-table-column label="操作" width="280" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" link size="small" @click="handleView(row)">查看</el-button>
             <el-button type="primary" link size="small" @click="handleEdit(row)">编辑</el-button>
             <el-button type="primary" link size="small" @click="handleStatistics(row)">统计</el-button>
+            <el-button 
+              v-if="row.status === 'INACTIVE'" 
+              type="success" 
+              link 
+              size="small" 
+              @click="handleActivate(row)"
+            >激活</el-button>
+            <el-button 
+              v-if="row.status === 'ACTIVE'" 
+              type="warning" 
+              link 
+              size="small" 
+              @click="handleDeactivate(row)"
+            >停用</el-button>
             <el-button type="danger" link size="small" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
@@ -77,17 +91,17 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Download } from '@element-plus/icons-vue'
 import SearchBar from '@/components/SearchBar.vue'
 import TableForm from '@/components/TableForm.vue'
-import { getSupplierList, deleteSupplier, getSupplierStatistics, type SupplierQueryParams } from '@/api/supplier'
+import { getSupplierList, deleteSupplier, getSupplierStatistics, activateSupplier, deactivateSupplier, type SupplierQueryParams } from '@/api/supplier'
 
 const router = useRouter()
 
 // 搜索配置
 const searchItems = [
   { prop: 'name', label: '供应商名称', type: 'input' },
-  { prop: 'code', label: '供应商编码', type: 'input' },
+  { prop: 'supplierNo', label: '供应商编码', type: 'input' },
   { prop: 'status', label: '状态', type: 'select', options: [
-    { label: '启用', value: 'active' },
-    { label: '停用', value: 'inactive' }
+    { label: '启用', value: 'ACTIVE' },
+    { label: '停用', value: 'INACTIVE' }
   ]}
 ]
 
@@ -109,33 +123,33 @@ const currentStatistics = ref<any>(null)
 const mockData = [
   {
     id: 1,
-    code: 'SUP001',
+    supplierNo: 'SUP001',
     name: '北京精密机械厂',
     contactPerson: '张经理',
     contactPhone: '13800138001',
     address: '北京市朝阳区工业园区',
-    status: 'active',
-    createTime: '2026-01-05 10:30:00'
+    status: 'ACTIVE',
+    createdAt: '2026-01-05 10:30:00'
   },
   {
     id: 2,
-    code: 'SUP002',
+    supplierNo: 'SUP002',
     name: '上海电子材料公司',
     contactPerson: '李经理',
     contactPhone: '13800138002',
     address: '上海市浦东新区',
-    status: 'active',
-    createTime: '2026-01-04 14:20:00'
+    status: 'ACTIVE',
+    createdAt: '2026-01-04 14:20:00'
   },
   {
     id: 3,
-    code: 'SUP003',
+    supplierNo: 'SUP003',
     name: '深圳五金制品厂',
     contactPerson: '王经理',
     contactPhone: '13800138003',
     address: '深圳市宝安区',
-    status: 'inactive',
-    createTime: '2026-01-03 09:15:00'
+    status: 'INACTIVE',
+    createdAt: '2026-01-03 09:15:00'
   }
 ]
 
@@ -149,7 +163,7 @@ const loadData = async () => {
       pageSize: pageSize.value
     }
     const res = await getSupplierList(params)
-    tableData.value = res.list
+    tableData.value = res.records
     total.value = res.total
   } catch (error) {
     console.error('加载供应商列表失败：', error)
@@ -216,6 +230,32 @@ const handleDelete = (row: any) => {
       loadData()
     } catch (error) {
       console.error('删除失败：', error)
+    }
+  }).catch(() => {})
+}
+
+// 激活供应商
+const handleActivate = async (row: any) => {
+  try {
+    await activateSupplier(row.id)
+    ElMessage.success('激活成功')
+    loadData()
+  } catch (error) {
+    console.error('激活失败：', error)
+  }
+}
+
+// 停用供应商
+const handleDeactivate = async (row: any) => {
+  ElMessageBox.confirm(`确定要停用供应商 "${row.name}" 吗？`, '提示', {
+    type: 'warning'
+  }).then(async () => {
+    try {
+      await deactivateSupplier(row.id)
+      ElMessage.success('停用成功')
+      loadData()
+    } catch (error) {
+      console.error('停用失败：', error)
     }
   }).catch(() => {})
 }

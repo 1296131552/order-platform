@@ -1,5 +1,6 @@
 /**
  * 供应商相关 API
+ * Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8
  */
 
 import request from '@/utils/request'
@@ -18,6 +19,7 @@ export interface SupplierQueryParams {
 /** 供应商信息 */
 export interface Supplier {
   id: number
+  supplierNo: string
   name: string
   code: string
   status: string
@@ -29,8 +31,8 @@ export interface Supplier {
   city?: string
   description?: string
   qualifications?: string[] // 资质文件URL
-  createTime: string
-  updateTime: string
+  createdAt: string
+  updatedAt: string
 }
 
 /** 供应商统计信息 */
@@ -45,8 +47,8 @@ export interface SupplierStatistics {
 
 /** 创建供应商参数 */
 export interface CreateSupplierParams {
+  supplierNo?: string
   name: string
-  code: string
   contactPerson: string
   contactPhone: string
   contactEmail?: string
@@ -59,27 +61,39 @@ export interface CreateSupplierParams {
 
 /**
  * 分页查询供应商列表
+ * Requirements: 7.1
  */
 export function getSupplierList(params: SupplierQueryParams) {
-  return request.get<{ list: Supplier[]; total: number }>('/supplier/list', { params })
+  return request.get<{ records: Supplier[]; total: number; size: number; current: number; pages: number }>('/supplier/list', { params })
 }
 
 /**
  * 获取供应商详情
+ * Requirements: 7.2
  */
 export function getSupplierDetail(id: number) {
   return request.get<Supplier>(`/supplier/${id}`)
 }
 
 /**
+ * 根据编号查询供应商
+ * Requirements: 7.3
+ */
+export function getSupplierByNo(supplierNo: string) {
+  return request.get<Supplier>(`/supplier/no/${supplierNo}`)
+}
+
+/**
  * 创建供应商
+ * Requirements: 7.4
  */
 export function createSupplier(data: CreateSupplierParams) {
-  return request.post<number>('/supplier/create', data)
+  return request.post<number>('/supplier/', data)
 }
 
 /**
  * 更新供应商
+ * Requirements: 7.5
  */
 export function updateSupplier(id: number, data: Partial<CreateSupplierParams>) {
   return request.put(`/supplier/${id}`, data)
@@ -87,9 +101,26 @@ export function updateSupplier(id: number, data: Partial<CreateSupplierParams>) 
 
 /**
  * 删除供应商
+ * Requirements: 7.6
  */
 export function deleteSupplier(id: number) {
   return request.delete(`/supplier/${id}`)
+}
+
+/**
+ * 激活供应商
+ * Requirements: 7.7
+ */
+export function activateSupplier(id: number) {
+  return request.put(`/supplier/${id}/activate`)
+}
+
+/**
+ * 停用供应商
+ * Requirements: 7.8
+ */
+export function deactivateSupplier(id: number) {
+  return request.put(`/supplier/${id}/deactivate`)
 }
 
 /**

@@ -15,9 +15,9 @@
       >
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="承运商编码" prop="code">
+            <el-form-item label="承运商编码" prop="carrierNo">
               <el-input
-                v-model="formData.code"
+                v-model="formData.carrierNo"
                 placeholder="请输入承运商编码"
                 clearable
               />
@@ -112,7 +112,7 @@ const submitting = ref(false)
 
 // 表单数据
 const formData = reactive<CreateCarrierParams>({
-  code: '',
+  carrierNo: '',
   name: '',
   contactPerson: '',
   contactPhone: '',
@@ -123,7 +123,7 @@ const formData = reactive<CreateCarrierParams>({
 
 // 表单验证规则
 const formRules: FormRules = {
-  code: [{ required: true, message: '请输入承运商编码', trigger: 'blur' }],
+  carrierNo: [{ required: true, message: '请输入承运商编码', trigger: 'blur' }],
   name: [{ required: true, message: '请输入承运商名称', trigger: 'blur' }],
   contactPerson: [{ required: true, message: '请输入联系人', trigger: 'blur' }],
   contactPhone: [
@@ -146,7 +146,7 @@ const loadCarrierDetail = async () => {
   try {
     const data = await getCarrierDetail(Number(route.params.id))
     Object.assign(formData, {
-      code: data.code,
+      carrierNo: data.carrierNo,
       name: data.name,
       contactPerson: data.contactPerson,
       contactPhone: data.contactPhone,

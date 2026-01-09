@@ -2,7 +2,7 @@
   <div class="order-create">
     <el-page-header @back="goBack" title="返回订单列表">
       <template #content>
-        <span class="page-title">创建订单</span>
+        <span class="page-title">{{ isEdit ? '编辑订单' : '创建订单' }}</span>
       </template>
     </el-page-header>
 
@@ -90,57 +90,66 @@
         <div class="table-header">
           <el-button type="primary" size="small" @click="handleAddItem">
             <el-icon><Plus /></el-icon>
-            添加商品
+            添加订单行
           </el-button>
         </div>
 
-        <el-table :data="formData.items" border style="width: 100%">
+        <el-table :data="formData.lines" border style="width: 100%">
           <el-table-column label="序号" type="index" width="60" />
-          <el-table-column label="商品" min-width="150">
+          <el-table-column label="供应商" min-width="150">
             <template #default="{ row }">
               <el-select
-                v-model="row.productId"
-                placeholder="请选择商品"
+                v-model="row.supplierId"
+                placeholder="请选择供应商"
                 filterable
-                @change="handleProductChange(row)"
               >
                 <el-option
-                  v-for="product in productList"
-                  :key="product.id"
-                  :label="product.name"
-                  :value="product.id"
+                  v-for="supplier in supplierList"
+                  :key="supplier.id"
+                  :label="supplier.name"
+                  :value="supplier.id"
                 />
               </el-select>
             </template>
           </el-table-column>
-          <el-table-column label="数量" width="150">
+          <el-table-column label="产品编号" width="140">
+            <template #default="{ row }">
+              <el-input v-model="row.productCode" placeholder="产品编号" />
+            </template>
+          </el-table-column>
+          <el-table-column label="产品名称" min-width="150">
+            <template #default="{ row }">
+              <el-input v-model="row.productName" placeholder="产品名称" />
+            </template>
+          </el-table-column>
+          <el-table-column label="数量" width="120">
             <template #default="{ row }">
               <el-input-number
                 v-model="row.quantity"
                 :min="1"
                 :precision="0"
                 controls-position="right"
-                @change="calculateItemAmount(row)"
+                size="small"
               />
             </template>
           </el-table-column>
-          <el-table-column label="单价" width="150">
+          <el-table-column label="单价" width="140">
             <template #default="{ row }">
               <el-input-number
-                v-model="row.price"
+                v-model="row.unitPrice"
                 :min="0"
                 :precision="2"
                 controls-position="right"
-                @change="calculateItemAmount(row)"
+                size="small"
               />
             </template>
           </el-table-column>
-          <el-table-column label="金额" width="150">
+          <el-table-column label="金额" width="120">
             <template #default="{ row }">
-              <span>{{ formatAmount(row.quantity * row.price) }}</span>
+              <span>{{ formatAmount((row.quantity || 0) * (row.unitPrice || 0)) }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="备注" width="180">
+          <el-table-column label="备注" width="150">
             <template #default="{ row }">
               <el-input v-model="row.remark" placeholder="备注" />
             </template>
@@ -164,14 +173,11 @@
           <span class="amount">{{ formatAmount(totalAmount) }}</span>
         </div>
 
-        <el-form-item>
+        <el-form-item class="form-actions">
           <el-button type="primary" @click="handleSubmit" :loading="submitting">
-            提交订单
+            {{ isEdit ? '保存修改' : '提交订单' }}
           </el-button>
           <el-button @click="handleCancel">取消</el-button>
-          <el-button type="warning" @click="handleSaveDraft" :loading="submitting">
-            保存草稿
-          </el-button>
         </el-form-item>
       </el-form>
     </el-card>
@@ -180,13 +186,27 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
-import { createOrder } from '@/api/order'
-import { formatAmount } from '@/utils/format'
+import { 
+  createOrder, 
+  updateOrder, 
+  getOrderWithLines,
+  type CreateOrderParams,
+  type UpdateOrderParams
+} from '@/api/order'
+import { 
+  batchAddOrderLines,
+  type AddOrderLineParams 
+} from '@/api/orderLine'
 
 const router = useRouter()
+const route = useRoute()
+
+// 是否编辑模式
+const isEdit = computed(() => !!route.params.id)
+const orderId = computed(() => Number(route.params.id) || 0)
 
 // 表单引用
 const formRef = ref<FormInstance>()
@@ -195,19 +215,30 @@ const formRef = ref<FormInstance>()
 const loading = ref(false)
 const submitting = ref(false)
 
-// 客户列表（模拟数据）
+// 客户列表（后续对接客户API）
 const customerList = ref([
-  { id: 1, name: '客户A' },
-  { id: 2, name: '客户B' },
-  { id: 3, name: '客户C' }
+  { id: 1, name: '北京科技有限公司' },
+  { id: 2, name: '上海贸易公司' },
+  { id: 3, name: '深圳电子厂' },
+  { id: 4, name: '广州物流有限公司' }
 ])
 
-// 商品列表（模拟数据）
-const productList = ref([
-  { id: 1, name: '商品A', price: 100 },
-  { id: 2, name: '商品B', price: 200 },
-  { id: 3, name: '商品C', price: 300 }
+// 供应商列表（后续对接供应商API）
+const supplierList = ref([
+  { id: 1, name: '供应商A' },
+  { id: 2, name: '供应商B' },
+  { id: 3, name: '供应商C' }
 ])
+
+// 订单行类型
+interface OrderLineForm {
+  supplierId: number | undefined
+  productCode: string
+  productName: string
+  quantity: number
+  unitPrice: number
+  remark: string
+}
 
 // 表单数据
 const formData = reactive({
@@ -217,12 +248,7 @@ const formData = reactive({
   contactPerson: '',
   contactPhone: '',
   remark: '',
-  items: [] as Array<{
-    productId: number | undefined
-    quantity: number
-    price: number
-    remark: string
-  }>
+  lines: [] as OrderLineForm[]
 })
 
 // 表单验证规则
@@ -238,46 +264,103 @@ const formRules: FormRules = {
 
 // 计算总金额
 const totalAmount = computed(() => {
-  return formData.items.reduce((sum, item) => {
-    return sum + (item.quantity || 0) * (item.price || 0)
+  return formData.lines.reduce((sum, item) => {
+    return sum + (item.quantity || 0) * (item.unitPrice || 0)
   }, 0)
 })
 
-// 添加商品行
-const handleAddItem = () => {
-  formData.items.push({
-    productId: undefined,
+// 格式化金额
+function formatAmount(amount: number): string {
+  return '¥' + amount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+// 添加订单行
+function handleAddItem() {
+  formData.lines.push({
+    supplierId: undefined,
+    productCode: '',
+    productName: '',
     quantity: 1,
-    price: 0,
+    unitPrice: 0,
     remark: ''
   })
 }
 
-// 删除商品行
-const handleRemoveItem = (index: number) => {
-  formData.items.splice(index, 1)
-}
-
-// 商品选择变化
-const handleProductChange = (row: any) => {
-  const product = productList.value.find(p => p.id === row.productId)
-  if (product) {
-    row.price = product.price
-  }
-}
-
-// 计算行金额
-const calculateItemAmount = (row: any) => {
-  // 金额会自动计算，这里只是为了触发响应式更新
+// 删除订单行
+function handleRemoveItem(index: number) {
+  formData.lines.splice(index, 1)
 }
 
 // 返回
-const goBack = () => {
+function goBack() {
   router.back()
 }
 
+// 加载订单数据（编辑模式）
+async function loadOrderData() {
+  if (!isEdit.value) return
+  
+  loading.value = true
+  try {
+    const res = await getOrderWithLines(orderId.value)
+    formData.customerId = res.customerId
+    formData.deliveryDate = res.deliveryDate || ''
+    formData.deliveryAddress = res.deliveryAddress || ''
+    formData.contactPerson = res.contactPerson || ''
+    formData.contactPhone = res.contactPhone || ''
+    formData.remark = res.remark || ''
+    formData.lines = res.lines.map(line => ({
+      supplierId: line.supplierId,
+      productCode: line.productCode,
+      productName: line.productName,
+      quantity: line.quantity,
+      unitPrice: line.unitPrice,
+      remark: line.remark || ''
+    }))
+  } catch (error) {
+    console.error('加载订单数据失败:', error)
+    ElMessage.error('加载订单数据失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+// 验证订单行
+function validateLines(): boolean {
+  if (formData.lines.length === 0) {
+    ElMessage.warning('请添加至少一个订单行')
+    return false
+  }
+  
+  for (let i = 0; i < formData.lines.length; i++) {
+    const line = formData.lines[i]
+    if (!line.supplierId) {
+      ElMessage.warning(`第 ${i + 1} 行请选择供应商`)
+      return false
+    }
+    if (!line.productCode) {
+      ElMessage.warning(`第 ${i + 1} 行请输入产品编号`)
+      return false
+    }
+    if (!line.productName) {
+      ElMessage.warning(`第 ${i + 1} 行请输入产品名称`)
+      return false
+    }
+    if (line.quantity <= 0) {
+      ElMessage.warning(`第 ${i + 1} 行数量必须大于0`)
+      return false
+    }
+    if (line.unitPrice < 0) {
+      ElMessage.warning(`第 ${i + 1} 行单价不能为负数`)
+      return false
+    }
+  }
+  
+  return true
+}
+
 // 提交订单
-const handleSubmit = async () => {
+async function handleSubmit() {
   if (!formRef.value) return
 
   // 验证表单
@@ -287,61 +370,73 @@ const handleSubmit = async () => {
     return
   }
 
-  // 验证明细
-  if (formData.items.length === 0) {
-    ElMessage.warning('请添加至少一个商品')
-    return
-  }
-
-  const hasEmptyItem = formData.items.some(item => !item.productId)
-  if (hasEmptyItem) {
-    ElMessage.warning('请选择所有商品')
+  // 验证订单行
+  if (!validateLines()) {
     return
   }
 
   submitting.value = true
   try {
-    const data = {
-      ...formData,
-      items: formData.items.filter(item => item.productId)
+    if (isEdit.value) {
+      // 更新订单
+      const updateParams: UpdateOrderParams = {
+        customerId: formData.customerId,
+        deliveryDate: formData.deliveryDate || undefined,
+        deliveryAddress: formData.deliveryAddress || undefined,
+        contactPerson: formData.contactPerson || undefined,
+        contactPhone: formData.contactPhone || undefined,
+        remark: formData.remark || undefined
+      }
+      await updateOrder(orderId.value, updateParams)
+      ElMessage.success('订单更新成功')
+      router.push(`/order/${orderId.value}`)
+    } else {
+      // 创建订单
+      const createParams: CreateOrderParams = {
+        customerId: formData.customerId!,
+        deliveryDate: formData.deliveryDate || undefined,
+        deliveryAddress: formData.deliveryAddress || undefined,
+        contactPerson: formData.contactPerson || undefined,
+        contactPhone: formData.contactPhone || undefined,
+        remark: formData.remark || undefined
+      }
+      const newOrderId = await createOrder(createParams)
+      
+      // 批量添加订单行
+      if (formData.lines.length > 0) {
+        const linesParams = {
+          orderId: newOrderId,
+          lines: formData.lines.map(line => ({
+            supplierId: line.supplierId!,
+            productCode: line.productCode,
+            productName: line.productName,
+            quantity: line.quantity,
+            unitPrice: line.unitPrice,
+            remark: line.remark || undefined
+          }))
+        }
+        await batchAddOrderLines(linesParams)
+      }
+      
+      ElMessage.success('订单创建成功')
+      router.push(`/order/${newOrderId}`)
     }
-    const orderId = await createOrder(data)
-    ElMessage.success('订单创建成功')
-    router.push(`/order/${orderId}`)
   } catch (error) {
-    console.error('创建订单失败：', error)
-  } finally {
-    submitting.value = false
-  }
-}
-
-// 保存草稿
-const handleSaveDraft = async () => {
-  submitting.value = true
-  try {
-    await createOrder({
-      ...formData,
-      items: formData.items.filter(item => item.productId)
-    })
-    ElMessage.success('草稿保存成功')
-    goBack()
-  } catch (error) {
-    console.error('保存草稿失败：', error)
+    console.error('保存订单失败:', error)
+    ElMessage.error('保存订单失败')
   } finally {
     submitting.value = false
   }
 }
 
 // 取消
-const handleCancel = () => {
+function handleCancel() {
   goBack()
 }
 
 // 初始化
 onMounted(() => {
-  // 可以在这里加载客户和商品列表
-  // loadCustomerList()
-  // loadProductList()
+  loadOrderData()
 })
 </script>
 
@@ -377,9 +472,21 @@ onMounted(() => {
     }
   }
 
+  .form-actions {
+    margin-top: 24px;
+  }
+
   :deep(.el-form-item__content) {
     .el-select,
     .el-date-picker {
+      width: 100%;
+    }
+  }
+
+  :deep(.el-table) {
+    .el-select,
+    .el-input,
+    .el-input-number {
       width: 100%;
     }
   }

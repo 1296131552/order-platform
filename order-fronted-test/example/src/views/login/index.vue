@@ -75,18 +75,26 @@
 </template>
 
 <script setup lang="ts">
+/**
+ * 登录页面
+ * Requirements: 1.1, 1.2
+ */
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { User, Lock, InfoFilled } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
-import { login, getUserInfo } from '@/api/auth'
+import { login, getCurrentUser } from '@/api/auth'
+import type { LoginResult } from '@/api/auth'
 
 // ==================== 类型定义 ====================
 
 interface LoginForm {
-  account: string  // 修改为 account，与后端保持一致
+  /** 账号（用户名/邮箱/手机号） - Requirements: 1.1 */
+  account: string
+  /** 密码 */
   password: string
+  /** 记住我 */
   remember: boolean
 }
 
@@ -98,7 +106,7 @@ interface LoginRules {
 // ==================== 响应式数据 ====================
 
 const loginForm = reactive<LoginForm>({
-  account: '',  // 修改为 account
+  account: '',
   password: '',
   remember: true
 })
@@ -115,6 +123,27 @@ const userStore = useUserStore()
 
 // ==================== 方法 ====================
 
+/**
+ * 处理登录响应，存储完整的登录信息
+ * Requirements: 1.2 - 存储token、tokenType、expiresIn和完整的userInfo信息
+ */
+const handleLoginResponse = (result: LoginResult) => {
+  // 使用新的 setLoginInfo 方法存储完整的登录信息
+  userStore.setLoginInfo({
+    token: result.token,
+    tokenType: result.tokenType || 'Bearer',
+    expiresIn: result.expiresIn,
+    userInfo: result.userInfo,
+    roles: result.roles || [],
+    permissions: result.permissions || [],
+    dataScope: result.dataScope
+  })
+}
+
+/**
+ * 处理登录
+ * Requirements: 1.1 - 使用account字段传递账号
+ */
 const handleLogin = async () => {
   const valid = await loginFormRef.value?.validate()
   if (!valid) return
@@ -122,24 +151,14 @@ const handleLogin = async () => {
   loading.value = true
 
   try {
-    // 调用登录接口
+    // 调用登录接口，使用account字段
     const result = await login({
-      account: loginForm.account,  // 修改为 account
+      account: loginForm.account,
       password: loginForm.password
     })
 
-    // 保存token
-    localStorage.setItem('token', result.token)
-
-    // 设置用户信息
-    userStore.setUserInfo({
-      id: result.userInfo.id,
-      username: result.userInfo.username,
-      realName: result.userInfo.realName,
-      email: result.userInfo.email || '',
-      avatar: result.userInfo.avatar || '',
-      roles: result.userInfo.roles
-    })
+    // 处理完整的登录响应
+    handleLoginResponse(result)
 
     ElMessage.success('登录成功')
 
@@ -156,23 +175,17 @@ const handleLogin = async () => {
 
 onMounted(async () => {
   // 如果已登录，验证token有效性并跳转
-  const token = localStorage.getItem('token')
-  if (token) {
+  if (userStore.token) {
     try {
-      // 验证token是否有效，获取用户信息
-      const userInfo = await getUserInfo()
-      userStore.setUserInfo({
-        id: userInfo.id,
-        username: userInfo.username,
-        realName: userInfo.realName,
-        email: userInfo.email || '',
-        avatar: userInfo.avatar || '',
-        roles: userInfo.roles
-      })
+      // 验证token是否有效，获取当前用户信息
+      const result = await getCurrentUser()
+      
+      // 更新用户信息
+      handleLoginResponse(result)
+      
       router.push('/dashboard')
     } catch (error) {
       // token无效，清除并停留在登录页
-      localStorage.removeItem('token')
       userStore.clearUserInfo()
     }
   }

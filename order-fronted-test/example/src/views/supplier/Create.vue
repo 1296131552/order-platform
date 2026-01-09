@@ -15,9 +15,9 @@
       >
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="供应商编码" prop="code">
+            <el-form-item label="供应商编码" prop="supplierNo">
               <el-input
-                v-model="formData.code"
+                v-model="formData.supplierNo"
                 placeholder="请输入供应商编码"
                 clearable
               />
@@ -112,7 +112,7 @@ const submitting = ref(false)
 
 // 表单数据
 const formData = reactive<CreateSupplierParams>({
-  code: '',
+  supplierNo: '',
   name: '',
   contactPerson: '',
   contactPhone: '',
@@ -123,7 +123,7 @@ const formData = reactive<CreateSupplierParams>({
 
 // 表单验证规则
 const formRules: FormRules = {
-  code: [{ required: true, message: '请输入供应商编码', trigger: 'blur' }],
+  supplierNo: [{ required: true, message: '请输入供应商编码', trigger: 'blur' }],
   name: [{ required: true, message: '请输入供应商名称', trigger: 'blur' }],
   contactPerson: [{ required: true, message: '请输入联系人', trigger: 'blur' }],
   contactPhone: [
@@ -146,7 +146,7 @@ const loadSupplierDetail = async () => {
   try {
     const data = await getSupplierDetail(Number(route.params.id))
     Object.assign(formData, {
-      code: data.code,
+      supplierNo: data.supplierNo,
       name: data.name,
       contactPerson: data.contactPerson,
       contactPhone: data.contactPhone,

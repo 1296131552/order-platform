@@ -1,20 +1,9 @@
 /**
  * 附件相关 API
+ * Requirements: 12.1, 12.2, 12.3, 12.4, 12.5
  */
 
 import request from '@/utils/request'
-
-/** 附件查询参数 */
-export interface AttachmentQueryParams {
-  page?: number
-  pageSize?: number
-  category?: string
-  relatedType?: string
-  relatedId?: number
-  fileName?: string
-  startDate?: string
-  endDate?: string
-}
 
 /** 附件信息 */
 export interface Attachment {
@@ -23,40 +12,30 @@ export interface Attachment {
   fileOriginalName: string
   fileSize: number
   fileType: string
-  category: string
-  relatedType?: string
-  relatedId?: number
   filePath: string
   url: string
   uploaderId: number
   uploaderName: string
-  remark?: string
-  createTime: string
-  updateTime: string
+  createdAt: string
+}
+
+/** 上传响应 */
+export interface UploadResult {
+  filePath: string
+  url: string
+  fileName: string
 }
 
 /**
- * 分页查询附件列表
+ * 上传单个附件
+ * POST /api/attachment/upload
+ * Requirements: 12.1
  */
-export function getAttachmentList(params: AttachmentQueryParams) {
-  return request.get<{ list: Attachment[]; total: number }>('/attachment/list', { params })
-}
-
-/**
- * 获取附件详情
- */
-export function getAttachmentDetail(id: number) {
-  return request.get<Attachment>(`/attachment/${id}`)
-}
-
-/**
- * 上传文件
- */
-export function uploadFile(file: File, onProgress?: (percent: number) => void) {
+export function uploadAttachment(file: File, onProgress?: (percent: number) => void) {
   const formData = new FormData()
   formData.append('file', file)
 
-  return request.post<{ filePath: string; url: string; fileName: string }>('/attachment/upload', formData, {
+  return request.post<UploadResult>('/attachment/upload', formData, {
     headers: {
       'Content-Type': 'multipart/form-data'
     },
@@ -70,15 +49,17 @@ export function uploadFile(file: File, onProgress?: (percent: number) => void) {
 }
 
 /**
- * 批量上传文件
+ * 批量上传附件
+ * POST /api/attachment/batch-upload
+ * Requirements: 12.2
  */
-export function uploadFiles(files: File[], onProgress?: (percent: number) => void) {
+export function batchUploadAttachment(files: File[], onProgress?: (percent: number) => void) {
   const formData = new FormData()
   files.forEach(file => {
     formData.append('files', file)
   })
 
-  return request.post<Array<{ filePath: string; url: string; fileName: string }>>('/attachment/upload/batch', formData, {
+  return request.post<UploadResult[]>('/attachment/batch-upload', formData, {
     headers: {
       'Content-Type': 'multipart/form-data'
     },
@@ -92,44 +73,28 @@ export function uploadFiles(files: File[], onProgress?: (percent: number) => voi
 }
 
 /**
- * 关联附件到业务对象
+ * 下载附件
+ * GET /api/attachment/download/{id}
+ * Requirements: 12.3
  */
-export function linkAttachment(data: {
-  attachmentId: number
-  relatedType: string
-  relatedId: number
-}) {
-  return request.post('/attachment/link', data)
-}
-
-/**
- * 取消关联附件
- */
-export function unlinkAttachment(data: {
-  attachmentId: number
-  relatedType: string
-  relatedId: number
-}) {
-  return request.post('/attachment/unlink', data)
+export function downloadAttachment(id: number) {
+  return request.get(`/attachment/download/${id}`, { responseType: 'blob' })
 }
 
 /**
  * 删除附件
+ * DELETE /api/attachment/{id}
+ * Requirements: 12.4
  */
 export function deleteAttachment(id: number) {
   return request.delete(`/attachment/${id}`)
 }
 
 /**
- * 下载附件
+ * 查询业务对象的附件列表
+ * GET /api/attachment/list/{bizId}
+ * Requirements: 12.5
  */
-export function downloadAttachment(id: number) {
-  return request.get(`/attachment/${id}/download`, { responseType: 'blob' })
-}
-
-/**
- * 获取附件分类列表
- */
-export function getAttachmentCategories() {
-  return request.get<Array<{ value: string; label: string }>>('/attachment/categories')
+export function getAttachmentListByBizId(bizId: number | string) {
+  return request.get<Attachment[]>(`/attachment/list/${bizId}`)
 }

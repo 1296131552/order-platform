@@ -3,20 +3,8 @@
     <!-- 搜索表单 -->
     <el-card class="search-card" shadow="never">
       <el-form :inline="true" :model="searchForm" class="search-form">
-        <el-form-item label="文件名称">
-          <el-input v-model="searchForm.fileName" placeholder="请输入文件名称" clearable />
-        </el-form-item>
-        <el-form-item label="关联单据">
-          <el-input v-model="searchForm.refNo" placeholder="请输入单据编号" clearable />
-        </el-form-item>
-        <el-form-item label="文件类型">
-          <el-select v-model="searchForm.fileType" placeholder="请选择类型" clearable style="width: 120px">
-            <el-option label="全部" value="" />
-            <el-option label="图片" value="image" />
-            <el-option label="文档" value="document" />
-            <el-option label="表格" value="spreadsheet" />
-            <el-option label="其他" value="other" />
-          </el-select>
+        <el-form-item label="业务ID">
+          <el-input v-model="searchForm.bizId" placeholder="请输入业务ID" clearable />
         </el-form-item>
         <el-form-item>
           <el-button type="primary" :icon="Search" @click="handleSearch">查询</el-button>
@@ -27,206 +15,221 @@
 
     <!-- 操作按钮 -->
     <div class="toolbar">
-      <el-button type="primary" :icon="Upload" @click="handleUpload">上传附件</el-button>
-      <el-button :icon="FolderAdd" @click="handleNewFolder">新建文件夹</el-button>
-      <el-button :icon="Download" @click="handleBatchDownload">批量下载</el-button>
+      <el-upload
+        ref="uploadRef"
+        :auto-upload="false"
+        :show-file-list="false"
+        :on-change="handleFileChange"
+        multiple
+      >
+        <el-button type="primary" :icon="Upload">上传附件</el-button>
+      </el-upload>
+      <el-button :icon="Download" :disabled="!selectedRows.length" @click="handleBatchDownload">
+        批量下载
+      </el-button>
     </div>
 
     <!-- 文件列表 -->
     <el-card class="file-card" shadow="never">
-      <el-table :data="tableData" v-loading="loading" border>
+      <el-table
+        :data="tableData"
+        v-loading="loading"
+        border
+        @selection-change="handleSelectionChange"
+      >
         <el-table-column type="selection" width="55" />
         <el-table-column label="文件名" min-width="250">
           <template #default="{ row }">
             <div class="file-name">
-              <el-icon v-if="row.type === 'folder'" :size="20"><Folder /></el-icon>
-              <el-icon v-else-if="row.fileType === 'image'" :size="20"><Picture /></el-icon>
-              <el-icon v-else-if="row.fileType === 'document'" :size="20"><Document /></el-icon>
-              <el-icon v-else-if="row.fileType === 'spreadsheet'" :size="20"><Tickets /></el-icon>
+              <el-icon v-if="isImage(row.fileType)" :size="20"><Picture /></el-icon>
               <el-icon v-else :size="20"><Document /></el-icon>
-              <span>{{ row.name }}</span>
+              <span>{{ row.fileOriginalName || row.fileName }}</span>
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="refType" label="关联类型" width="120">
+        <el-table-column prop="fileType" label="文件类型" width="120" />
+        <el-table-column label="文件大小" width="120">
           <template #default="{ row }">
-            <el-tag v-if="row.refType" size="small">{{ getRefTypeText(row.refType) }}</el-tag>
+            {{ formatFileSize(row.fileSize) }}
           </template>
         </el-table-column>
-        <el-table-column prop="refNo" label="关联单据" width="150" />
-        <el-table-column prop="fileSize" label="文件大小" width="100" />
-        <el-table-column prop="uploader" label="上传人" width="100" />
-        <el-table-column prop="uploadTime" label="上传时间" width="160" />
+        <el-table-column prop="uploaderName" label="上传人" width="100" />
+        <el-table-column prop="createdAt" label="上传时间" width="180" />
         <el-table-column label="操作" width="180" fixed="right">
           <template #default="{ row }">
-            <el-button v-if="row.type !== 'folder'" type="primary" link size="small" @click="handleDownload(row)">
+            <el-button type="primary" link size="small" @click="handleDownload(row)">
               下载
             </el-button>
-            <el-button type="primary" link size="small" @click="handlePreview(row)">预览</el-button>
-            <el-button type="danger" link size="small" @click="handleDelete(row)">删除</el-button>
+            <el-button type="primary" link size="small" @click="handlePreview(row)">
+              预览
+            </el-button>
+            <el-popconfirm title="确定删除该附件吗？" @confirm="handleDelete(row)">
+              <template #reference>
+                <el-button type="danger" link size="small">删除</el-button>
+              </template>
+            </el-popconfirm>
           </template>
         </el-table-column>
       </el-table>
-
-      <!-- 分页 -->
-      <el-pagination
-        v-model:current-page="pagination.page"
-        v-model:page-size="pagination.pageSize"
-        :page-sizes="[10, 20, 50, 100]"
-        :total="pagination.total"
-        layout="total, sizes, prev, pager, next, jumper"
-        @size-change="handleSizeChange"
-        @current-change="handleCurrentChange"
-      />
     </el-card>
+
+    <!-- 预览对话框 -->
+    <el-dialog v-model="previewVisible" title="文件预览" width="800px">
+      <div class="preview-content">
+        <img v-if="previewType === 'image'" :src="previewUrl" alt="预览图片" />
+        <div v-else class="no-preview">
+          <el-icon :size="64"><Document /></el-icon>
+          <p>该文件类型不支持预览，请下载后查看</p>
+        </div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Upload, Download, Search, Refresh, Picture, Document } from '@element-plus/icons-vue'
+import type { UploadFile } from 'element-plus'
 import {
-  Upload,
-  FolderAdd,
-  Download,
-  Search,
-  Refresh,
-  Folder,
-  Picture,
-  Document,
-  Tickets
-} from '@element-plus/icons-vue'
+  getAttachmentListByBizId,
+  uploadAttachment,
+  batchUploadAttachment,
+  downloadAttachment,
+  deleteAttachment,
+  type Attachment
+} from '@/api/attachment'
 
 // 搜索表单
 const searchForm = reactive({
-  fileName: '',
-  refNo: '',
-  fileType: ''
+  bizId: ''
 })
 
 // 表格数据
 const loading = ref(false)
-const tableData = ref([
-  {
-    id: 1,
-    name: '订单相关文档',
-    type: 'folder',
-    fileType: '',
-    refType: '',
-    refNo: '',
-    fileSize: '-',
-    uploader: 'admin',
-    uploadTime: '2026-01-05 10:00:00'
-  },
-  {
-    id: 2,
-    name: 'ORD20260105001_合同.pdf',
-    type: 'file',
-    fileType: 'document',
-    refType: 'order',
-    refNo: 'ORD20260105001',
-    fileSize: '2.5 MB',
-    uploader: '张三',
-    uploadTime: '2026-01-05 14:30:00'
-  },
-  {
-    id: 3,
-    name: 'ORD20260104002_产品图片.jpg',
-    type: 'file',
-    fileType: 'image',
-    refType: 'order',
-    refNo: 'ORD20260104002',
-    fileSize: '1.2 MB',
-    uploader: '李四',
-    uploadTime: '2026-01-04 16:20:00'
-  },
-  {
-    id: 4,
-    name: 'SHP20260108001_运单.xlsx',
-    type: 'file',
-    fileType: 'spreadsheet',
-    refType: 'shipment',
-    refNo: 'SHP20260108001',
-    fileSize: '156 KB',
-    uploader: '王五',
-    uploadTime: '2026-01-08 09:15:00'
-  }
-])
+const tableData = ref<Attachment[]>([])
+const selectedRows = ref<Attachment[]>([])
 
-// 分页
-const pagination = reactive({
-  page: 1,
-  pageSize: 10,
-  total: 4
-})
+// 预览
+const previewVisible = ref(false)
+const previewUrl = ref('')
+const previewType = ref<'image' | 'other'>('other')
 
 // 搜索
-function handleSearch() {
+async function handleSearch() {
+  if (!searchForm.bizId) {
+    ElMessage.warning('请输入业务ID')
+    return
+  }
   loading.value = true
-  setTimeout(() => {
-    loading.value = false
+  try {
+    const res = await getAttachmentListByBizId(searchForm.bizId)
+    tableData.value = res || []
     ElMessage.success('查询成功')
-  }, 500)
+  } catch (error) {
+    console.error('查询附件列表失败:', error)
+  } finally {
+    loading.value = false
+  }
 }
 
 // 重置
 function handleReset() {
-  Object.assign(searchForm, {
-    fileName: '',
-    refNo: '',
-    fileType: ''
-  })
-  ElMessage.info('已重置搜索条件')
+  searchForm.bizId = ''
+  tableData.value = []
+  ElMessage.info('已重置')
 }
 
-// 上传附件
-function handleUpload() {
-  ElMessage.info('上传附件功能开发中')
-}
-
-// 新建文件夹
-function handleNewFolder() {
-  ElMessage.info('新建文件夹功能开发中')
+// 文件选择变化
+async function handleFileChange(uploadFile: UploadFile) {
+  if (!uploadFile.raw) return
+  
+  loading.value = true
+  try {
+    await uploadAttachment(uploadFile.raw)
+    ElMessage.success('上传成功')
+    // 如果有业务ID，刷新列表
+    if (searchForm.bizId) {
+      await handleSearch()
+    }
+  } catch (error) {
+    console.error('上传失败:', error)
+  } finally {
+    loading.value = false
+  }
 }
 
 // 批量下载
-function handleBatchDownload() {
-  ElMessage.info('批量下载功能开发中')
+async function handleBatchDownload() {
+  for (const row of selectedRows.value) {
+    await handleDownload(row)
+  }
 }
 
 // 下载
-function handleDownload(row: any) {
-  ElMessage.success(`开始下载：${row.name}`)
+async function handleDownload(row: Attachment) {
+  try {
+    const res = await downloadAttachment(row.id)
+    // 创建下载链接
+    const blob = new Blob([res as unknown as BlobPart])
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = row.fileOriginalName || row.fileName
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+    ElMessage.success(`开始下载：${row.fileOriginalName || row.fileName}`)
+  } catch (error) {
+    console.error('下载失败:', error)
+  }
 }
 
 // 预览
-function handlePreview(row: any) {
-  ElMessage.info(`预览文件：${row.name}`)
+function handlePreview(row: Attachment) {
+  if (isImage(row.fileType)) {
+    previewType.value = 'image'
+    previewUrl.value = row.url
+  } else {
+    previewType.value = 'other'
+    previewUrl.value = ''
+  }
+  previewVisible.value = true
 }
 
 // 删除
-function handleDelete(row: any) {
-  ElMessage.success(`已删除：${row.name}`)
-}
-
-// 分页
-function handleSizeChange(size: number) {
-  pagination.pageSize = size
-}
-
-function handleCurrentChange(page: number) {
-  pagination.page = page
-}
-
-// 关联类型文本
-function getRefTypeText(type: string) {
-  const map: Record<string, string> = {
-    order: '订单',
-    shipment: '发运',
-    receipt: '签收',
-    exception: '异常'
+async function handleDelete(row: Attachment) {
+  try {
+    await deleteAttachment(row.id)
+    ElMessage.success('删除成功')
+    // 刷新列表
+    if (searchForm.bizId) {
+      await handleSearch()
+    }
+  } catch (error) {
+    console.error('删除失败:', error)
   }
-  return map[type] || '其他'
+}
+
+// 选择变化
+function handleSelectionChange(rows: Attachment[]) {
+  selectedRows.value = rows
+}
+
+// 判断是否为图片
+function isImage(fileType: string): boolean {
+  if (!fileType) return false
+  return fileType.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(fileType.toLowerCase())
+}
+
+// 格式化文件大小
+function formatFileSize(size: number): string {
+  if (!size) return '-'
+  if (size < 1024) return size + ' B'
+  if (size < 1024 * 1024) return (size / 1024).toFixed(2) + ' KB'
+  if (size < 1024 * 1024 * 1024) return (size / (1024 * 1024)).toFixed(2) + ' MB'
+  return (size / (1024 * 1024 * 1024)).toFixed(2) + ' GB'
 }
 </script>
 
@@ -246,6 +249,8 @@ function getRefTypeText(type: string) {
 
   .toolbar {
     margin-bottom: 16px;
+    display: flex;
+    gap: 12px;
   }
 
   .file-card {
@@ -260,10 +265,26 @@ function getRefTypeText(type: string) {
         white-space: nowrap;
       }
     }
+  }
 
-    .el-pagination {
-      margin-top: 16px;
-      justify-content: flex-end;
+  .preview-content {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 300px;
+
+    img {
+      max-width: 100%;
+      max-height: 500px;
+    }
+
+    .no-preview {
+      text-align: center;
+      color: #909399;
+
+      p {
+        margin-top: 16px;
+      }
     }
   }
 }

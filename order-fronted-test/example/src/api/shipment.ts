@@ -1,8 +1,25 @@
 /**
  * 发运相关 API
+ * Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8
  */
 
 import request from '@/utils/request'
+
+/** 分页响应类型 */
+export interface PageResponse<T> {
+  records: T[]
+  total: number
+  size: number
+  current: number
+  pages: number
+}
+
+/** 发运状态枚举 */
+export enum ShipmentStatus {
+  PENDING = 'PENDING',       // 待提货
+  IN_TRANSIT = 'IN_TRANSIT', // 在途
+  DELIVERED = 'DELIVERED'    // 已到货
+}
 
 /** 发运查询参数 */
 export interface ShipmentQueryParams {
@@ -25,6 +42,8 @@ export interface Shipment {
   orderNo: string
   carrierId: number
   carrierName: string
+  customerId?: number
+  customerName?: string
   status: string
   vehicleNo?: string
   driverName?: string
@@ -32,10 +51,12 @@ export interface Shipment {
   departureTime?: string
   estimatedArrivalTime?: string
   actualArrivalTime?: string
+  shipmentAddress?: string
+  receiverAddress?: string
   route?: string
   remark?: string
-  createTime: string
-  updateTime: string
+  createdAt: string
+  updatedAt: string
 }
 
 /** 创建发运参数 */
@@ -46,52 +67,76 @@ export interface CreateShipmentParams {
   driverName?: string
   driverPhone?: string
   estimatedArrivalTime?: string
+  shipmentAddress?: string
+  receiverAddress?: string
   route?: string
   remark?: string
-  items: {
-    orderId: number
-    productId: number
-    quantity: number
-  }[]
+}
+
+/** 更新发运参数 */
+export interface UpdateShipmentParams {
+  carrierId?: number
+  vehicleNo?: string
+  driverName?: string
+  driverPhone?: string
+  estimatedArrivalTime?: string
+  shipmentAddress?: string
+  receiverAddress?: string
+  route?: string
+  remark?: string
+}
+
+/** 发运统计数据 */
+export interface ShipmentStatistics {
+  totalCount: number
+  pendingCount: number
+  inTransitCount: number
+  deliveredCount: number
 }
 
 /**
  * 分页查询发运列表
+ * Requirements: 4.1
  */
 export function getShipmentList(params: ShipmentQueryParams) {
-  return request.get<{ list: Shipment[]; total: number }>('/shipment/list', { params })
+  return request.get<PageResponse<Shipment>>('/shipment/list', { params })
 }
 
 /**
  * 获取发运详情
+ * Requirements: 4.2
  */
 export function getShipmentDetail(id: number) {
   return request.get<Shipment>(`/shipment/${id}`)
 }
 
 /**
- * 创建发运
+ * 创建发运单
+ * Requirements: 4.3
  */
 export function createShipment(data: CreateShipmentParams) {
   return request.post<number>('/shipment/create', data)
 }
 
 /**
- * 更新发运
+ * 更新发运单
+ * Requirements: 4.4
  */
-export function updateShipment(id: number, data: Partial<CreateShipmentParams>) {
+export function updateShipment(id: number, data: UpdateShipmentParams) {
   return request.put(`/shipment/${id}`, data)
 }
 
 /**
- * 删除发运
+ * 删除发运单
+ * Requirements: 4.5
  */
 export function deleteShipment(id: number) {
   return request.delete(`/shipment/${id}`)
 }
 
 /**
- * 发货
+ * 确认发货
+ * Requirements: 4.6
  */
 export function dispatchShipment(id: number, data: { departureTime: string }) {
   return request.post(`/shipment/${id}/dispatch`, data)
@@ -99,13 +144,22 @@ export function dispatchShipment(id: number, data: { departureTime: string }) {
 
 /**
  * 确认到货
+ * Requirements: 4.7
  */
-export function confirmArrival(id: number, data: { arrivalTime: string; remark?: string }) {
+export function arriveShipment(id: number, data: { arrivalTime: string; remark?: string }) {
   return request.post(`/shipment/${id}/arrive`, data)
 }
 
 /**
- * 获取发运轨迹
+ * 获取发运统计数据
+ * Requirements: 4.8
+ */
+export function getShipmentStatistics() {
+  return request.get<ShipmentStatistics>('/shipment/statistics')
+}
+
+/**
+ * 获取发运轨迹（辅助接口）
  */
 export function getShipmentTrack(id: number) {
   return request.get<Array<{
@@ -114,16 +168,4 @@ export function getShipmentTrack(id: number) {
     status: string
     description?: string
   }>>(`/shipment/${id}/track`)
-}
-
-/**
- * 获取发运统计数据
- */
-export function getShipmentStatistics() {
-  return request.get<{
-    totalCount: number
-    pendingCount: number
-    inTransitCount: number
-    deliveredCount: number
-  }>('/shipment/statistics')
 }

@@ -4,12 +4,22 @@
     <el-page-header @back="goBack" title="返回供应商列表">
       <template #content>
         <span class="page-title">{{ supplier?.name }}</span>
-        <el-tag :type="supplier?.status === 'active' ? 'success' : 'info'" style="margin-left: 12px">
-          {{ supplier?.status === 'active' ? '启用' : '停用' }}
+        <el-tag :type="supplier?.status === 'ACTIVE' ? 'success' : 'info'" style="margin-left: 12px">
+          {{ supplier?.status === 'ACTIVE' ? '启用' : '停用' }}
         </el-tag>
       </template>
       <template #extra>
         <el-button type="primary" @click="handleEdit">编辑</el-button>
+        <el-button 
+          v-if="supplier?.status === 'INACTIVE'" 
+          type="success" 
+          @click="handleActivate"
+        >激活</el-button>
+        <el-button 
+          v-if="supplier?.status === 'ACTIVE'" 
+          type="warning" 
+          @click="handleDeactivate"
+        >停用</el-button>
       </template>
     </el-page-header>
 
@@ -20,7 +30,7 @@
       </template>
       <el-descriptions :column="2" border>
         <el-descriptions-item label="供应商编码">
-          {{ supplier?.code }}
+          {{ supplier?.supplierNo }}
         </el-descriptions-item>
         <el-descriptions-item label="供应商名称">
           {{ supplier?.name }}
@@ -35,8 +45,8 @@
           {{ supplier?.contactEmail || '-' }}
         </el-descriptions-item>
         <el-descriptions-item label="状态">
-          <el-tag :type="supplier?.status === 'active' ? 'success' : 'info'">
-            {{ supplier?.status === 'active' ? '启用' : '停用' }}
+          <el-tag :type="supplier?.status === 'ACTIVE' ? 'success' : 'info'">
+            {{ supplier?.status === 'ACTIVE' ? '启用' : '停用' }}
           </el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="地址" :span="2">
@@ -132,8 +142,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { getSupplierDetail, getSupplierStatistics, getSupplierOrders } from '@/api/supplier'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { getSupplierDetail, getSupplierStatistics, getSupplierOrders, activateSupplier, deactivateSupplier } from '@/api/supplier'
 import { ORDER_STATUS_MAP } from '@/utils/constants'
 
 const route = useRoute()
@@ -188,6 +198,32 @@ const goBack = () => {
 // 编辑
 const handleEdit = () => {
   router.push(`/supplier/edit/${supplierId.value}`)
+}
+
+// 激活供应商
+const handleActivate = async () => {
+  try {
+    await activateSupplier(supplierId.value)
+    ElMessage.success('激活成功')
+    loadSupplierDetail()
+  } catch (error) {
+    console.error('激活失败：', error)
+  }
+}
+
+// 停用供应商
+const handleDeactivate = () => {
+  ElMessageBox.confirm(`确定要停用供应商 "${supplier.value?.name}" 吗？`, '提示', {
+    type: 'warning'
+  }).then(async () => {
+    try {
+      await deactivateSupplier(supplierId.value)
+      ElMessage.success('停用成功')
+      loadSupplierDetail()
+    } catch (error) {
+      console.error('停用失败：', error)
+    }
+  }).catch(() => {})
 }
 
 // 上传资质

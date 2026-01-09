@@ -3,12 +3,22 @@
     <el-page-header @back="goBack" title="返回承运商列表">
       <template #content>
         <span class="page-title">{{ carrier?.name }}</span>
-        <el-tag :type="carrier?.status === 'active' ? 'success' : 'info'" style="margin-left: 12px">
-          {{ carrier?.status === 'active' ? '启用' : '停用' }}
+        <el-tag :type="carrier?.status === 'ACTIVE' ? 'success' : 'info'" style="margin-left: 12px">
+          {{ carrier?.status === 'ACTIVE' ? '启用' : '停用' }}
         </el-tag>
       </template>
       <template #extra>
         <el-button type="primary" @click="handleEdit">编辑</el-button>
+        <el-button 
+          v-if="carrier?.status === 'INACTIVE'" 
+          type="success" 
+          @click="handleActivate"
+        >激活</el-button>
+        <el-button 
+          v-if="carrier?.status === 'ACTIVE'" 
+          type="warning" 
+          @click="handleDeactivate"
+        >停用</el-button>
       </template>
     </el-page-header>
 
@@ -19,7 +29,7 @@
       </template>
       <el-descriptions :column="2" border>
         <el-descriptions-item label="承运商编码">
-          {{ carrier?.code }}
+          {{ carrier?.carrierNo }}
         </el-descriptions-item>
         <el-descriptions-item label="承运商名称">
           {{ carrier?.name }}
@@ -34,8 +44,8 @@
           {{ carrier?.contactEmail || '-' }}
         </el-descriptions-item>
         <el-descriptions-item label="状态">
-          <el-tag :type="carrier?.status === 'active' ? 'success' : 'info'">
-            {{ carrier?.status === 'active' ? '启用' : '停用' }}
+          <el-tag :type="carrier?.status === 'ACTIVE' ? 'success' : 'info'">
+            {{ carrier?.status === 'ACTIVE' ? '启用' : '停用' }}
           </el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="地址" :span="2">
@@ -132,8 +142,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { getCarrierDetail, getCarrierStatistics, getCarrierShipments, getCarrierVehicles } from '@/api/carrier'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { getCarrierDetail, getCarrierStatistics, getCarrierShipments, getCarrierVehicles, activateCarrier, deactivateCarrier } from '@/api/carrier'
 import { SHIPMENT_STATUS_MAP } from '@/utils/constants'
 
 const route = useRoute()
@@ -198,6 +208,32 @@ const goBack = () => {
 // 编辑
 const handleEdit = () => {
   router.push(`/carrier/edit/${carrierId.value}`)
+}
+
+// 激活承运商
+const handleActivate = async () => {
+  try {
+    await activateCarrier(carrierId.value)
+    ElMessage.success('激活成功')
+    loadCarrierDetail()
+  } catch (error) {
+    console.error('激活失败：', error)
+  }
+}
+
+// 停用承运商
+const handleDeactivate = () => {
+  ElMessageBox.confirm(`确定要停用承运商 "${carrier.value?.name}" 吗？`, '提示', {
+    type: 'warning'
+  }).then(async () => {
+    try {
+      await deactivateCarrier(carrierId.value)
+      ElMessage.success('停用成功')
+      loadCarrierDetail()
+    } catch (error) {
+      console.error('停用失败：', error)
+    }
+  }).catch(() => {})
 }
 
 // 添加车辆

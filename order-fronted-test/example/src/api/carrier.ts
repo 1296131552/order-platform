@@ -1,5 +1,6 @@
 /**
  * 承运商相关 API
+ * Requirements: 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7, 8.8
  */
 
 import request from '@/utils/request'
@@ -18,6 +19,7 @@ export interface CarrierQueryParams {
 /** 承运商信息 */
 export interface Carrier {
   id: number
+  carrierNo: string
   name: string
   code: string
   status: string
@@ -27,8 +29,8 @@ export interface Carrier {
   address: string
   description?: string
   qualifications?: string[] // 资质文件URL
-  createTime: string
-  updateTime: string
+  createdAt: string
+  updatedAt: string
 }
 
 /** 车辆信息 */
@@ -55,8 +57,8 @@ export interface CarrierStatistics {
 
 /** 创建承运商参数 */
 export interface CreateCarrierParams {
+  carrierNo?: string
   name: string
-  code: string
   contactPerson: string
   contactPhone: string
   contactEmail?: string
@@ -67,27 +69,39 @@ export interface CreateCarrierParams {
 
 /**
  * 分页查询承运商列表
+ * Requirements: 8.1
  */
 export function getCarrierList(params: CarrierQueryParams) {
-  return request.get<{ list: Carrier[]; total: number }>('/carrier/list', { params })
+  return request.get<{ records: Carrier[]; total: number; size: number; current: number; pages: number }>('/carrier/list', { params })
 }
 
 /**
  * 获取承运商详情
+ * Requirements: 8.2
  */
 export function getCarrierDetail(id: number) {
   return request.get<Carrier>(`/carrier/${id}`)
 }
 
 /**
+ * 根据编号查询承运商
+ * Requirements: 8.3
+ */
+export function getCarrierByNo(carrierNo: string) {
+  return request.get<Carrier>(`/carrier/no/${carrierNo}`)
+}
+
+/**
  * 创建承运商
+ * Requirements: 8.4
  */
 export function createCarrier(data: CreateCarrierParams) {
-  return request.post<number>('/carrier/create', data)
+  return request.post<number>('/carrier/', data)
 }
 
 /**
  * 更新承运商
+ * Requirements: 8.5
  */
 export function updateCarrier(id: number, data: Partial<CreateCarrierParams>) {
   return request.put(`/carrier/${id}`, data)
@@ -95,9 +109,26 @@ export function updateCarrier(id: number, data: Partial<CreateCarrierParams>) {
 
 /**
  * 删除承运商
+ * Requirements: 8.6
  */
 export function deleteCarrier(id: number) {
   return request.delete(`/carrier/${id}`)
+}
+
+/**
+ * 激活承运商
+ * Requirements: 8.7
+ */
+export function activateCarrier(id: number) {
+  return request.put(`/carrier/${id}/activate`)
+}
+
+/**
+ * 停用承运商
+ * Requirements: 8.8
+ */
+export function deactivateCarrier(id: number) {
+  return request.put(`/carrier/${id}/deactivate`)
 }
 
 /**
