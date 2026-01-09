@@ -171,7 +171,8 @@ class OperationLogAspectTest {
         @DisplayName("✅ 应该通过恰好等于最大长度的表达式")
         void shouldPass_expressionExactlyMaxLength() {
             // Arrange
-            String expression = "#a".repeat(100) + "." + "#b".repeat(98); // 恰好 200 字符
+            // 创建恰好 200 字符的表达式: "#" + 199个"a"
+            String expression = "#" + "a".repeat(199); // 恰好 200 字符
 
             // Act & Assert
             assertThatCode(() -> {
@@ -217,7 +218,7 @@ class OperationLogAspectTest {
             })
                 .isInstanceOf(SecurityException.class)
                 .hasMessageContaining("禁止的危险表达式模式");
-        }
+        }                                                                         
 
         @Test
         @DisplayName("🚫 应该拒绝 Runtime.exec() 调用")

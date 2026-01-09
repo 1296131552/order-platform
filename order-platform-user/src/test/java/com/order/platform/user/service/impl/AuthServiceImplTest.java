@@ -1,6 +1,9 @@
 package com.order.platform.user.service.impl;
 
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.order.platform.common.config.OrderPlatformProperties;
+import com.order.platform.common.dto.CurrentUserDTO;
 import com.order.platform.common.enums.ResponseCode;
 import com.order.platform.common.exception.BusinessException;
 import com.order.platform.common.service.OperationLogService;
@@ -17,6 +20,7 @@ import com.order.platform.user.service.AuthHelper;
 import com.order.platform.user.service.PermissionService;
 import com.order.platform.user.utils.PasswordEncoderUtil;
 import com.order.platform.user.vo.LoginVO;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -28,6 +32,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -35,6 +41,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -55,6 +62,7 @@ import static org.mockito.Mockito.*;
  * @since 1.0.0
  */
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 @DisplayName("认证服务测试")
 class AuthServiceImplTest {
 
@@ -77,9 +85,6 @@ class AuthServiceImplTest {
     private AuthHelper authHelper;
 
     @Mock
-    private PasswordEncoderUtil passwordEncoderUtil;
-
-    @Mock
     private JwtUtil jwtUtil;
 
     @Mock
@@ -94,12 +99,39 @@ class AuthServiceImplTest {
     @Mock
     private ValueOperations<String, String> valueOperations;
 
+    @Mock
+    private PasswordEncoderUtil passwordEncoderUtil;  // 添加实例 mock
+
+    private MockedStatic<PasswordEncoderUtil> mockedPasswordEncoderUtil;  // 静态方法 mock
+
     private User testUser;
     private LoginDTO validLoginDTO;
     private String validToken = "valid.jwt.token";
 
     @BeforeEach
     void setUp() {
+        // 初始化 MyBatis Plus TableInfoHelper
+        // 解决单元测试中使用 Lambda 表达式时 "can not find lambda cache" 的问题
+        // 参考: https://blog.csdn.net/Li_WenZhang/article/details/142104309
+        TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), User.class);
+        TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), Role.class);
+
+        // 手动注入 passwordEncoderUtil 实例 mock
+        // @InjectMocks 无法注入 final 字段，需要使用 ReflectionTestUtils
+        ReflectionTestUtils.setField(authService, "passwordEncoderUtil", passwordEncoderUtil);
+
+        // 初始化静态方法 mock（用于 encode 和 matches 静态方法）
+        mockedPasswordEncoderUtil = mockStatic(PasswordEncoderUtil.class);
+        mockedPasswordEncoderUtil.when(() -> PasswordEncoderUtil.matches(anyString(), anyString())).thenReturn(true);
+        mockedPasswordEncoderUtil.when(() -> PasswordEncoderUtil.encode(anyString())).thenReturn("$2a$10$encoded");
+
+        // 配置 passwordEncoderUtil 实例 mock（用于 validateStrength 实例方法）
+        PasswordEncoderUtil.PasswordStrength validStrength = mock(PasswordEncoderUtil.PasswordStrength.class);
+        when(validStrength.isValid()).thenReturn(true);
+        when(validStrength.getScore()).thenReturn(80);
+        when(validStrength.getMessage()).thenReturn("密码强度良好");
+        when(passwordEncoderUtil.validateStrength(anyString())).thenReturn(validStrength);
+
         // 初始化测试用户
         testUser = createTestUser();
 
@@ -108,6 +140,9 @@ class AuthServiceImplTest {
         validLoginDTO.setAccount("testuser");
         validLoginDTO.setPassword("Test123456!");
 
+        // Mock userMapper.selectById for updateLoginInfo
+        when(userMapper.selectById(1L)).thenReturn(testUser);
+
         // Mock Redis operations
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
 
@@ -115,11 +150,19 @@ class AuthServiceImplTest {
         OrderPlatformProperties.Jwt jwtProps = mock(OrderPlatformProperties.Jwt.class);
         when(jwtProps.getExpiration()).thenReturn(604800L); // 7 天
         when(properties.getJwt()).thenReturn(jwtProps);
+
+        // Mock Security properties
+        OrderPlatformProperties.Security securityProps = mock(OrderPlatformProperties.Security.class);
+        when(securityProps.getPassword()).thenReturn(mock(OrderPlatformProperties.Security.Password.class));
+        when(properties.getSecurity()).thenReturn(securityProps);
     }
 
     @AfterEach
     void tearDown() {
-        // 清理资源
+        // 清理静态方法 mock
+        if (mockedPasswordEncoderUtil != null) {
+            mockedPasswordEncoderUtil.close();
+        }
     }
 
     // ==================== 辅助方法 ====================
@@ -131,11 +174,15 @@ class AuthServiceImplTest {
         user.setPassword("$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy");
         user.setEmail("test@example.com");
         user.setPhone("13800138000");
-        user.setStatus("ACTIVE");
         user.setAuditStatus(UserAuditStatus.APPROVED.name());
-        user.setPasswordChangedAt(LocalDateTime.now().minusDays(30));
-        user.setLastLoginAt(LocalDateTime.now().minusDays(1));
+        user.setIsEnabled(1);
+        user.setIsLocked(0);
+        user.setIsDeleted(0);  // 添加删除标记初始化
+        user.setPasswordChangedTime(LocalDateTime.now().minusDays(30));
+        user.setLastLoginTime(LocalDateTime.now().minusDays(1));
         user.setLoginCount(5);
+        user.setDepartmentId(10L);
+        user.setDepartmentName("测试部门");
         return user;
     }
 
@@ -144,6 +191,18 @@ class AuthServiceImplTest {
         dto.setAccount(account);
         dto.setPassword(password);
         return dto;
+    }
+
+    private Role createMockRole(Long id, String roleCode, String roleName, Integer dataScopeType) {
+        Role role = new Role();
+        role.setId(id);
+        role.setRoleCode(roleCode);
+        role.setRoleName(roleName);
+        role.setRoleType("BUSINESS");
+        role.setDataScopeType(dataScopeType);
+        role.setIsEnabled(1);
+        role.setIsSystem(0);
+        return role;
     }
 
     // ==================== 登录功能测试 ====================
@@ -159,12 +218,11 @@ class AuthServiceImplTest {
         void shouldLogin_success_withUsername() {
             // Arrange
             when(userMapper.selectByUsername("testuser")).thenReturn(testUser);
-            when(passwordEncoderUtil.matches(anyString(), anyString())).thenReturn(true);
             when(jwtUtil.generateToken(anyLong(), anyString(), anyList())).thenReturn(validToken);
             when(userRoleMapper.selectRoleIdsByUserId(1L)).thenReturn(List.of(1L));
             when(userRoleMapper.selectRoleCodesByUserId(1L)).thenReturn(List.of("USER"));
+            when(roleMapper.selectById(1L)).thenReturn(createMockRole(1L, "USER", "普通用户", 3));
             when(permissionService.getPermissionsByRoleIds(anyList())).thenReturn(List.of("user:read"));
-            when(authHelper.buildDataScope(any(), anyList())).thenReturn(mock(LoginVO.DataScopeInfo.class));
 
             // Act
             LoginVO result = authService.login(validLoginDTO);
@@ -184,12 +242,11 @@ class AuthServiceImplTest {
             // Arrange
             LoginDTO loginDTO = createLoginDTO("test@example.com", "Test123456!");
             when(userMapper.selectByEmail("test@example.com")).thenReturn(testUser);
-            when(passwordEncoderUtil.matches(anyString(), anyString())).thenReturn(true);
             when(jwtUtil.generateToken(anyLong(), anyString(), anyList())).thenReturn(validToken);
             when(userRoleMapper.selectRoleIdsByUserId(1L)).thenReturn(List.of(1L));
             when(userRoleMapper.selectRoleCodesByUserId(1L)).thenReturn(List.of("USER"));
+            when(roleMapper.selectById(1L)).thenReturn(createMockRole(1L, "USER", "普通用户", 3));
             when(permissionService.getPermissionsByRoleIds(anyList())).thenReturn(List.of());
-            when(authHelper.buildDataScope(any(), anyList())).thenReturn(mock(LoginVO.DataScopeInfo.class));
 
             // Act
             LoginVO result = authService.login(loginDTO);
@@ -208,12 +265,11 @@ class AuthServiceImplTest {
             // Arrange
             LoginDTO loginDTO = createLoginDTO("13800138000", "Test123456!");
             when(userMapper.selectByPhone("13800138000")).thenReturn(testUser);
-            when(passwordEncoderUtil.matches(anyString(), anyString())).thenReturn(true);
             when(jwtUtil.generateToken(anyLong(), anyString(), anyList())).thenReturn(validToken);
             when(userRoleMapper.selectRoleIdsByUserId(1L)).thenReturn(List.of(1L));
             when(userRoleMapper.selectRoleCodesByUserId(1L)).thenReturn(List.of("USER"));
+            when(roleMapper.selectById(1L)).thenReturn(createMockRole(1L, "USER", "普通用户", 3));
             when(permissionService.getPermissionsByRoleIds(anyList())).thenReturn(List.of());
-            when(authHelper.buildDataScope(any(), anyList())).thenReturn(mock(LoginVO.DataScopeInfo.class));
 
             // Act
             LoginVO result = authService.login(loginDTO);
@@ -248,7 +304,10 @@ class AuthServiceImplTest {
         void shouldRejectLogin_wrongPassword() {
             // Arrange
             when(userMapper.selectByUsername("testuser")).thenReturn(testUser);
-            when(passwordEncoderUtil.matches(anyString(), anyString())).thenReturn(false);
+
+            // 覆盖 setUp() 中的 mock，让密码校验失败
+            mockedPasswordEncoderUtil.when(() -> PasswordEncoderUtil.matches(eq("Test123456!"), anyString()))
+                .thenReturn(false);
 
             // Act & Assert
             assertThatThrownBy(() -> authService.login(validLoginDTO))
@@ -260,20 +319,22 @@ class AuthServiceImplTest {
         @DisplayName("❌ 应该拒绝登录（用户已禁用）")
         void shouldRejectLogin_userDisabled() {
             // Arrange
-            testUser.setStatus("DISABLED");
+            testUser.setIsEnabled(0);
+            testUser.setAuditStatus("APPROVED");
             when(userMapper.selectByUsername("testuser")).thenReturn(testUser);
 
             // Act & Assert
             assertThatThrownBy(() -> authService.login(validLoginDTO))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("用户已被禁用");
+                .hasMessageContaining("账户已禁用");
         }
 
         @Test
         @DisplayName("❌ 应该拒绝登录（用户已锁定）")
         void shouldRejectLogin_userLocked() {
             // Arrange
-            testUser.setStatus("LOCKED");
+            testUser.setIsLocked(1);
+            testUser.setAuditStatus("APPROVED");
             when(userMapper.selectByUsername("testuser")).thenReturn(testUser);
 
             // Act & Assert
@@ -337,12 +398,11 @@ class AuthServiceImplTest {
             // Arrange
             testUser.setAuditStatus(UserAuditStatus.APPROVED.name());
             when(userMapper.selectByUsername("testuser")).thenReturn(testUser);
-            when(passwordEncoderUtil.matches(anyString(), anyString())).thenReturn(true);
             when(jwtUtil.generateToken(anyLong(), anyString(), anyList())).thenReturn(validToken);
             when(userRoleMapper.selectRoleIdsByUserId(1L)).thenReturn(List.of(1L));
             when(userRoleMapper.selectRoleCodesByUserId(1L)).thenReturn(List.of("USER"));
+            when(roleMapper.selectById(1L)).thenReturn(createMockRole(1L, "USER", "普通用户", 3));
             when(permissionService.getPermissionsByRoleIds(anyList())).thenReturn(List.of());
-            when(authHelper.buildDataScope(any(), anyList())).thenReturn(mock(LoginVO.DataScopeInfo.class));
 
             // Act
             LoginVO result = authService.login(validLoginDTO);
@@ -358,12 +418,11 @@ class AuthServiceImplTest {
             // Arrange
             testUser.setAuditStatus(UserAuditStatus.NONE.name());
             when(userMapper.selectByUsername("testuser")).thenReturn(testUser);
-            when(passwordEncoderUtil.matches(anyString(), anyString())).thenReturn(true);
             when(jwtUtil.generateToken(anyLong(), anyString(), anyList())).thenReturn(validToken);
             when(userRoleMapper.selectRoleIdsByUserId(1L)).thenReturn(List.of(1L));
             when(userRoleMapper.selectRoleCodesByUserId(1L)).thenReturn(List.of("USER"));
+            when(roleMapper.selectById(1L)).thenReturn(createMockRole(1L, "USER", "普通用户", 3));
             when(permissionService.getPermissionsByRoleIds(anyList())).thenReturn(List.of());
-            when(authHelper.buildDataScope(any(), anyList())).thenReturn(mock(LoginVO.DataScopeInfo.class));
 
             // Act
             LoginVO result = authService.login(validLoginDTO);
@@ -423,7 +482,8 @@ class AuthServiceImplTest {
         void shouldRejectRefreshToken_userDisabled() {
             // Arrange
             String oldToken = "old.jwt.token";
-            testUser.setStatus("DISABLED");
+            testUser.setIsEnabled(0);
+            testUser.setAuditStatus("APPROVED");
             when(jwtUtil.getUserIdFromToken(oldToken)).thenReturn(1L);
             when(userMapper.selectById(1L)).thenReturn(testUser);
 
@@ -506,8 +566,6 @@ class AuthServiceImplTest {
             dto.setNewPassword("NewTest123!");
 
             when(userMapper.selectById(userId)).thenReturn(testUser);
-            when(passwordEncoderUtil.matches("Test123456!", testUser.getPassword())).thenReturn(true);
-            when(passwordEncoderUtil.encode("NewTest123!")).thenReturn("$2a$10$newhash");
 
             // Act & Assert
             assertThatCode(() -> authService.changePassword(userId, dto))
@@ -527,7 +585,10 @@ class AuthServiceImplTest {
             dto.setNewPassword("NewTest123!");
 
             when(userMapper.selectById(userId)).thenReturn(testUser);
-            when(passwordEncoderUtil.matches("WrongPassword!", testUser.getPassword())).thenReturn(false);
+
+            // 覆盖 setUp() 中的 mock，让旧密码校验失败
+            mockedPasswordEncoderUtil.when(() -> PasswordEncoderUtil.matches(eq("WrongPassword!"), anyString()))
+                .thenReturn(false);
 
             // Act & Assert
             assertThatThrownBy(() -> authService.changePassword(userId, dto))
@@ -545,7 +606,6 @@ class AuthServiceImplTest {
             dto.setNewPassword("Test123456!");
 
             when(userMapper.selectById(userId)).thenReturn(testUser);
-            when(passwordEncoderUtil.matches("Test123456!", testUser.getPassword())).thenReturn(true);
 
             // Act & Assert
             assertThatThrownBy(() -> authService.changePassword(userId, dto))
@@ -582,12 +642,11 @@ class AuthServiceImplTest {
         void shouldPreventTimingAttack_passwordVerification() {
             // Arrange
             when(userMapper.selectByUsername("testuser")).thenReturn(testUser);
-            when(passwordEncoderUtil.matches(anyString(), anyString())).thenReturn(true);
             when(jwtUtil.generateToken(anyLong(), anyString(), anyList())).thenReturn(validToken);
             when(userRoleMapper.selectRoleIdsByUserId(1L)).thenReturn(List.of(1L));
             when(userRoleMapper.selectRoleCodesByUserId(1L)).thenReturn(List.of("USER"));
+            when(roleMapper.selectById(1L)).thenReturn(createMockRole(1L, "USER", "普通用户", 3));
             when(permissionService.getPermissionsByRoleIds(anyList())).thenReturn(List.of());
-            when(authHelper.buildDataScope(any(), anyList())).thenReturn(mock(LoginVO.DataScopeInfo.class));
 
             // Act - 测试多次登录耗时应该相近
             long startTime1 = System.nanoTime();
@@ -609,12 +668,11 @@ class AuthServiceImplTest {
         void shouldClearPasswordErrorCounter_afterSuccessfulLogin() {
             // Arrange
             when(userMapper.selectByUsername("testuser")).thenReturn(testUser);
-            when(passwordEncoderUtil.matches(anyString(), anyString())).thenReturn(true);
             when(jwtUtil.generateToken(anyLong(), anyString(), anyList())).thenReturn(validToken);
             when(userRoleMapper.selectRoleIdsByUserId(1L)).thenReturn(List.of(1L));
             when(userRoleMapper.selectRoleCodesByUserId(1L)).thenReturn(List.of("USER"));
+            when(roleMapper.selectById(1L)).thenReturn(createMockRole(1L, "USER", "普通用户", 3));
             when(permissionService.getPermissionsByRoleIds(anyList())).thenReturn(List.of());
-            when(authHelper.buildDataScope(any(), anyList())).thenReturn(mock(LoginVO.DataScopeInfo.class));
 
             // Act
             authService.login(validLoginDTO);

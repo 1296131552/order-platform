@@ -21,6 +21,7 @@ import com.order.platform.user.service.AuthService;
 import com.order.platform.user.service.AuthHelper;
 import com.order.platform.user.service.PermissionService;
 import com.order.platform.user.utils.PasswordEncoderUtil;
+import com.order.platform.user.enums.UserAuditStatus;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -95,31 +96,13 @@ public class AuthServiceImpl implements AuthService {
         validateUserStatus(user);
 
         // 4. 验证用户审核状态（自主注册用户需要审核通过后才能登录）
-        // TODO(human): 实现用户审核状态检查逻辑
-        //
-        // 背景：自主注册的用户需要经过管理员审核后才能登录系统
-        //       邀请码注册的用户（audit_status=NONE）可以直接登录
-        //       我们需要根据用户的审核状态决定是否允许登录
-        //
-        // 您的任务：实现以下逻辑
-        // 1. 获取用户审核状态：String auditStatus = user.getAuditStatus()
-        // 2. 检查审核状态，根据不同情况处理：
-        //    - 如果是 "PENDING"（待审核）：抛出异常，提示"账号正在审核中，请耐心等待或联系管理员"
-        //    - 如果是 "REJECTED"（已拒绝）：抛出异常，提示"账号审核未通过，如需帮助请联系管理员"
-        //    - 如果是 "APPROVED"（已通过）或 "NONE"（无需审核）：继续登录流程
-        //
-        // 提示：
-        // - 使用 UserAuditStatus 枚举类中的常量：UserAuditStatus.PENDING.name()
-        // - 抛出业务异常：throw new BusinessException(ResponseCode.USER_AUDIT_PENDING)
-        // - 需要在 ResponseCode 中添加错误码：
-        //   - USER_AUDIT_PENDING(1021, "账号正在审核中，请耐心等待或联系管理员")
-        //   - USER_AUDIT_REJECTED(1022, "账号审核未通过，如需帮助请联系管理员")
-        //
-        // 示例代码结构（请完善）：
-        // String auditStatus = user.getAuditStatus();
-        // if (UserAuditStatus.PENDING.name().equals(auditStatus)) {
-        //     throw new BusinessException(ResponseCode.USER_AUDIT_PENDING);
-        // }
+        String auditStatus = user.getAuditStatus();
+        if (UserAuditStatus.PENDING.name().equals(auditStatus)) {
+            throw new BusinessException(ResponseCode.USER_AUDIT_PENDING);
+        } else if (UserAuditStatus.REJECTED.name().equals(auditStatus)) {
+            throw new BusinessException(ResponseCode.USER_AUDIT_REJECTED);
+        }
+        // APPROVED 和 NONE 状态允许继续登录
 
         // 5. 验证密码（BCrypt）
         validatePassword(user, loginDTO.getPassword());
@@ -194,20 +177,28 @@ public class AuthServiceImpl implements AuthService {
 
             // 2. 查询用户信息（验证用户是否存在）
             User user = userMapper.selectById(userId);
-            if (user == null) {
+            if (user == null || user.getIsDeleted() == 1) {
                 throw new BusinessException(ResponseCode.USER_NOT_FOUND, "用户不存在");
             }
 
-            // 3. 查询用户角色（获取最新角色信息）
+            // 3. 验证用户状态（启用、锁定）
+            validateUserStatus(user);
+
+            // 4. 查询用户角色（获取最新角色信息）
             List<String> roleCodes = userRoleMapper.selectRoleCodesByUserId(user.getId());
 
-            // 4. 生成新Token（包含最新角色信息）
+            // 5. 生成新Token（包含最新角色信息）
             String newToken = jwtUtil.generateToken(userId, username, roleCodes);
 
             log.info("Token刷新成功: userId={}", userId);
             return newToken;
 
+        } catch (BusinessException e) {
+            // 业务异常直接重新抛出，保留原始错误信息
+            log.error("Token刷新失败: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
+            // 其他异常包装为业务异常
             log.error("Token刷新失败", e);
             throw new BusinessException(ResponseCode.TOKEN_INVALID, "Token刷新失败");
         }
@@ -248,14 +239,15 @@ public class AuthServiceImpl implements AuthService {
             throw new BusinessException(ResponseCode.VALIDATION_ERROR, strength.getMessage());
         }
 
-        // 5. 验证两次输入的新密码是否一致
-        if (!changePasswordDTO.getNewPassword().equals(changePasswordDTO.getConfirmPassword())) {
-            throw new BusinessException(ResponseCode.VALIDATION_ERROR, "两次输入的新密码不一致");
-        }
-
-        // 6. 检查新旧密码是否相同
+        // 5. 检查新旧密码是否相同（优先检查，提供更准确的错误提示）
         if (changePasswordDTO.getOldPassword().equals(changePasswordDTO.getNewPassword())) {
             throw new BusinessException(ResponseCode.VALIDATION_ERROR, "新密码不能与旧密码相同");
+        }
+
+        // 6. 验证两次输入的新密码是否一致（仅在 confirmPassword 非空时校验）
+        if (changePasswordDTO.getConfirmPassword() != null &&
+            !changePasswordDTO.getNewPassword().equals(changePasswordDTO.getConfirmPassword())) {
+            throw new BusinessException(ResponseCode.VALIDATION_ERROR, "两次输入的新密码不一致");
         }
 
         // 7. 加密新密码
@@ -526,8 +518,8 @@ public class AuthServiceImpl implements AuthService {
             user = userMapper.selectByUsername(account);
         }
 
-        // 2. 用户不存在
-        if (user == null) {
+        // 2. 用户不存在或已删除
+        if (user == null || user.getIsDeleted() == 1) {
             throw new BusinessException(ResponseCode.USER_NOT_FOUND, "用户不存在");
         }
 
@@ -547,7 +539,7 @@ public class AuthServiceImpl implements AuthService {
         if (isAccountLocked(user)) {
             int lockMinutes = properties.getSecurity().getPassword().getLockMinutes();
             throw new BusinessException(ResponseCode.USER_LOCKED,
-                "账户已锁定，请" + lockMinutes + "分钟后再试");
+                "用户已被锁定，请" + lockMinutes + "分钟后再试");
         }
     }
 

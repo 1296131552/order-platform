@@ -158,6 +158,7 @@ spring:
     url: jdbc:mysql://localhost:3306/opv-test1?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: root
     password: 你的MySQL密码
+    生产环境配置（必须修改 JWT 密钥）
 ```
 
 **生产环境配置**（必须修改 JWT 密钥）：
@@ -1113,6 +1114,11 @@ Column 'updated_at' cannot be null
 
 | 日期 | 优先级 | 问题 | 修复方案 |
 |------|--------|------|----------|
+| 2026-01-10 | **P0** | 单元测试失败：passwordEncoderUtil 为 null | 使用 ReflectionTestUtils 手动注入 mock，配置实例方法 |
+| 2026-01-10 | **P1** | 单元测试失败：缺少用户状态检查 | 添加删除用户检查、审核状态检查（PENDING/REJECTED） |
+| 2026-01-10 | **P1** | 单元测试失败：错误消息格式不统一 | 统一锁定账户错误消息为"用户已被锁定" |
+| 2026-01-10 | **P2** | 单元测试失败：refreshToken 异常处理 | 区分 BusinessException 重新抛出，保留原始错误信息 |
+| 2026-01-10 | **测试** | MyBatis Plus Lambda 缓存问题 | 在测试 setUp 中初始化 TableInfoHelper |
 | 2026-01-07 | **架构** | Maven 多模块 Lombok 编译失败 | 统一配置依赖版本和编译器插件，修正 Lombok 作用域 |
 | 2026-01-07 | **P0** | PasswordEncoderUtil 硬编码 | 注入 OrderPlatformProperties，从配置读取参数 |
 | 2026-01-07 | **P0** | JwtUtil 配置方式不一致 | 改用 OrderPlatformProperties 读取配置 |
@@ -1152,6 +1158,7 @@ Column 'updated_at' cannot be null
 
 | 日期 | 版本 | 更新内容 | 更新人 |
 |------|------|----------|--------|
+| 2026-01-10 | v1.0.5 | 修复单元测试全部通过（56/56）：解决 passwordEncoderUtil 依赖注入、用户状态检查、错误消息格式、refreshToken 异常处理等问题 | 开发组 |
 | 2026-01-07 | v1.0.4 | 验证 Maven 多模块 Lombok 编译问题完全解决，Lombok @Builder 完全可用 | 开发组 |
 | 2026-01-07 | v1.0.3 | 修复 Maven 多模块 Lombok 编译问题，统一配置依赖版本和编译器插件 | 开发组 |
 | 2026-01-07 | v1.0.2 | 修复 P1 优先级问题：AuthController 测试代码、PasswordEncoderUtil 静态调用、操作日志集成 | 开发组 |
