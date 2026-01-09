@@ -63,9 +63,9 @@ jobs:
           # 超时设置
           timeout: 300
 
-          env:
-            # 设置 GitHub Token（用于 PR 评论）
-            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          # 设置 GitHub Token（用于 PR 评论）
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 📊 上传 SARIF 报告到 GitHub Security
         if: always()
