@@ -2,7 +2,7 @@ name: 🔒 安全扫描 (Security Scan)
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop, feature/** ]
   pull_request:
     branches: [ main, develop ]
   schedule:
