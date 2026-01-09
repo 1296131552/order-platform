@@ -85,7 +85,9 @@ public class PasswordEncoderUtil {
      * <pre>
      * String rawPassword = "123456";
      * String encodedPassword = PasswordEncoderUtil.encode(rawPassword);
+     * // 示例输出（每次加密结果都不同，这是 BCrypt 的盐值特性）:
      * // encodedPassword: $2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy
+     * // 注意：以上仅为演示格式，非真实凭据
      * </pre>
      *
      * @param rawPassword 明文密码
@@ -119,9 +121,11 @@ public class PasswordEncoderUtil {
      * 使用示例：
      * <pre>
      * String rawPassword = "123456";
+     * // 示例哈希值（仅供演示，非真实凭据）:
      * String encodedPassword = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
      * boolean matches = PasswordEncoderUtil.matches(rawPassword, encodedPassword);
      * // matches: true
+     * // 注意：以上哈希值仅为示例格式演示
      * </pre>
      *
      * @param rawPassword     明文密码（用户输入的密码）

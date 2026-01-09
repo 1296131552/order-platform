@@ -1,7 +1,7 @@
 package com.order.platform.user.service.impl;
 
 import com.order.platform.common.config.OrderPlatformProperties;
-import com.order.platform.common.dto.CurrentUser;
+import com.order.platform.common.dto.CurrentUserDTO;
 import com.order.platform.common.dto.OperationLogDTO;
 import com.order.platform.common.enums.OperationModule;
 import com.order.platform.common.enums.OperationType;
@@ -11,7 +11,7 @@ import com.order.platform.common.service.OperationLogService;
 import com.order.platform.common.util.JwtUtil;
 import com.order.platform.user.dto.request.ChangePasswordDTO;
 import com.order.platform.user.dto.request.LoginDTO;
-import com.order.platform.user.dto.response.LoginVO;
+import com.order.platform.user.vo.LoginVO;
 import com.order.platform.user.entity.Role;
 import com.order.platform.user.entity.User;
 import com.order.platform.user.mapper.RoleMapper;
@@ -26,10 +26,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.redis.core.StringRedisTemplate;
 
 import java.time.LocalDateTime;
 import java.util.List;
-
+import java.util.concurrent.TimeUnit;
 /**
  * 认证服务实现类
  *
@@ -73,7 +74,8 @@ public class AuthServiceImpl implements AuthService {
     private final JwtUtil jwtUtil;
     private final OperationLogService operationLogService;
     private final OrderPlatformProperties properties;
-
+    /** Redis 模板（用于 Token 黑名单） */
+    private final StringRedisTemplate redisTemplate;
     /**
      * 用户登录
      *
@@ -128,18 +130,25 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public void logout(String token, String clientIp) {
         try {
-            // 1. 验证Token并获取用户ID
+            // 1. 先将 Token 加入 Redis 黑名单（无论 Token 是否有效）
+            // 这样即使 Token 已过期，也能确保无法重放
+            String blacklistKey = "token:blacklist:" + token;
+            redisTemplate
+                .opsForValue()
+                .set(
+                    blacklistKey,
+                    "1",
+                    properties.getJwt().getExpiration(),
+                    TimeUnit.SECONDS
+                );
+
+            // 2. 验证Token并获取用户ID（用于日志记录）
             Long userId = jwtUtil.getUserIdFromToken(token);
 
-            log.info("用户登出成功: userId={}, clientIp={}", userId, clientIp);
-
-            // 注意：Token是无状态的，不需要在服务端删除
-            // 客户端负责删除本地存储的Token
-            // 如果需要强制失效，可以使用Redis黑名单机制（TODO）
-
         } catch (Exception e) {
-            log.error("用户登出失败: token={}", token, e);
-            // 登出失败不影响前端清除Token
+            // Token 可能已过期或其他错误，但不影响退出流程
+            // 前端已经清除本地 Token，退出流程继续
+            log.debug("Token 解析失败（可能已过期），不影响退出: {}", e.getMessage());
         }
     }
 
@@ -309,7 +318,7 @@ public class AuthServiceImpl implements AuthService {
             }
 
             List<String> roleCodes = userRoleMapper.selectRoleCodesByUserId(userId);
-            CurrentUser currentUser = authHelper.toCurrentUser(user, roleCodes);
+            CurrentUserDTO currentUser = authHelper.toCurrentUserDTO(user, roleCodes);
 
             return currentUser;
 
@@ -656,7 +665,7 @@ public class AuthServiceImpl implements AuthService {
      */
     private LoginVO buildLoginVO(String token, User user, List<String> roles,
                                  List<String> permissions, LoginVO.DataScopeInfo dataScope) {
-        CurrentUser currentUser = authHelper.toCurrentUser(user, roles);
+        CurrentUserDTO currentUser = authHelper.toCurrentUserDTO(user, roles);
 
         return LoginVO.builder()
             .token(token)

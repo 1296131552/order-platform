@@ -59,7 +59,7 @@ order-platform-common/
     │   ├── MybatisPlusMetaObjectHandler.java # MyBatis Plus 自动填充
     │   └── WebMvcConfig.java                # Web MVC 配置
     ├── dto/                                 # 数据传输对象
-    │   ├── CurrentUser.java                 # 当前用户信息
+    │   ├── CurrentUserDTO.java              # 当前用户信息DTO
     │   └── OperationLogDTO.java             # 操作日志DTO
     ├── entity/                              # 实体类
     │   └── OperationLog.java                # 操作日志实体
@@ -121,23 +121,6 @@ public class OrderController {
 - 支持类级别注解
 
 #### JwtUtil 工具类
-
-```java
-// 生成 Token（含角色）
-String token = jwtUtil.generateToken(userId, username, roles);
-
-// 解析 Token
-Long userId = jwtUtil.getUserIdFromToken(token);
-String username = jwtUtil.getUsernameFromToken(token);
-List<String> roles = jwtUtil.getRolesFromToken(token);
-```
-
----
-
-### 2. 异常处理
-
-#### BusinessException 业务异常
-
 ```java
 // 抛出业务异常
 throw new BusinessException(ResponseCode.USER_NOT_FOUND);
@@ -182,9 +165,26 @@ return Result.error(ResponseCode.VALIDATION_ERROR, "参数错误");
 |-----------|------|------|
 | 200 | 成功 | SUCCESS |
 | 400-499 | 客户端错误 | UNAUTHORIZED(401), FORBIDDEN(403) |
-| 1000-1999 | 用户相关 | USER_NOT_FOUND(1001), TOKEN_EXPIRED(1005) |
+| 1000-1999 | 用户相关 | USER_NOT_FOUND(1001), EMAIL_ALREADY_EXISTS(1011), PHONE_ALREADY_EXISTS(1012) |
 | 2000-2999 | 订单相关 | ORDER_NOT_FOUND(2001) |
 | 3000-3999 | 发运相关 | SHIPMENT_NOT_FOUND(3001) |
+
+**用户相关错误码（1000-1999）**：
+
+| 错误码 | 常量名 | 说明 |
+|-------|--------|------|
+| 1001 | USER_NOT_FOUND | 用户不存在 |
+| 1002 | USER_PASSWORD_ERROR | 密码错误 |
+| 1003 | USER_ALREADY_EXISTS | 用户已存在 |
+| 1004 | TOKEN_INVALID | Token 无效 |
+| 1005 | TOKEN_EXPIRED | Token 已过期 |
+| 1006 | VALIDATION_ERROR | 参数验证失败 |
+| 1007 | USER_DISABLED | 账户已禁用 |
+| 1008 | USER_LOCKED | 账户已锁定 |
+| 1009 | PASSWORD_ERROR | 密码错误 |
+| 1010 | PASSWORD_EXPIRED | 密码已过期 |
+| 1011 | EMAIL_ALREADY_EXISTS | 邮箱已存在 |
+| 1012 | PHONE_ALREADY_EXISTS | 手机号已存在 |
 
 ---
 
@@ -194,7 +194,7 @@ return Result.error(ResponseCode.VALIDATION_ERROR, "参数错误");
 
 ```java
 // 获取当前用户
-CurrentUser user = CurrentUserHolder.get();
+CurrentUserDTO user = CurrentUserHolder.get();
 
 // 获取用户ID
 Long userId = user.getId();
@@ -206,15 +206,16 @@ String username = user.getUsername();
 List<String> roles = user.getRoles();
 ```
 
-#### CurrentUser 用户信息
+#### CurrentUserDTO 用户信息
 
 ```java
 @Data
 @Builder
-public class CurrentUser {
+public class CurrentUserDTO {
     private Long id;           // 用户ID
     private String username;   // 用户名
     private List<String> roles;// 角色列表
+    // ... 更多字段见源码
 }
 ```
 
@@ -430,7 +431,7 @@ public class DemoController {
     @GetMapping("/user")
     public Result getUser() {
         // 2. 获取当前用户
-        CurrentUser user = CurrentUserHolder.get();
+        CurrentUserDTO user = CurrentUserHolder.get();
         return Result.success(user);
     }
 
@@ -547,6 +548,59 @@ public class DemoController {
 
 ## 更新记录
 
+### v1.0.6 (2026-01-09)
+
+#### 新增用户唯一性校验错误码
+
+**背景**：
+用户名、邮箱、手机号的唯一性冲突是不同的错误场景，应该使用独立的错误码，便于前端精确处理和国际化支持。
+
+**修改内容**：
+
+1. **新增错误码**：
+   - `EMAIL_ALREADY_EXISTS(1011, "邮箱已存在")` - 邮箱唯一性冲突
+   - `PHONE_ALREADY_EXISTS(1012, "手机号已存在")` - 手机号唯一性冲突
+
+2. **保留原有错误码**：
+   - `USER_ALREADY_EXISTS(1003, "用户已存在")` - 保留用于通用场景
+
+3. **设计说明**：
+   - 前端可根据 code 值精确判断冲突类型
+   - 不依赖 message 文本，支持国际化
+   - 符合 RESTful API 设计最佳实践
+
+**使用示例**：
+```java
+// 邮箱冲突
+throw new BusinessException(
+    ResponseCode.EMAIL_ALREADY_EXISTS,
+    "邮箱[" + email + "]已存在"
+);
+
+// 手机号冲突
+throw new BusinessException(
+    ResponseCode.PHONE_ALREADY_EXISTS,
+    "手机号[" + phone + "]已存在"
+);
+```
+
+**前端处理**：
+```javascript
+switch (error.response.data.code) {
+  case 1011: // 邮箱冲突
+    formErrors.email = message;
+    break;
+  case 1012: // 手机号冲突
+    formErrors.phone = message;
+    break;
+}
+```
+
+**相关文件**：
+- `enums/ResponseCode.java`
+
+---
+
 ### v1.0.5 (2026-01-07)
 
 #### User表迁移到user模块
@@ -563,19 +617,19 @@ User表是业务实体，应该归属于user模块而非common模块。将user.s
 
 2. **模块解耦验证**：
    - ✅ Common模块不依赖User实体类
-   - ✅ Common模块只使用CurrentUser DTO
+   - ✅ Common模块只使用CurrentUserDTO DTO
    - ✅ Common模块通过UserRoleProvider接口与user模块交互
    - ✅ 零影响：common模块功能完全正常
 
 3. **设计说明**：
    - User实体类（25字段）归属于user模块
-   - CurrentUser DTO（11字段）保留在common模块
-   - 通过AuthHelper实现User → CurrentUser转换
+   - CurrentUserDTO DTO（11字段）保留在common模块
+   - 通过AuthHelper实现User → CurrentUserDTO转换
    - Common模块提供通用功能，User模块负责用户业务
 
 **相关文件**：
 - ~~`src/main/resources/sql/user.sql`~~（已移除）
-- `dto/CurrentUser.java`（保留）
+- `dto/CurrentUserDTO.java`（保留）
 - `provider/UserRoleProvider.java`（保留）
 
 **影响范围**：
@@ -593,7 +647,7 @@ User表是业务实体，应该归属于user模块而非common模块。将user.s
 
 **修改内容**：
 
-1. **CurrentUser 扩展**：
+1. **CurrentUserDTO 扩展**：
    - 新增 `userCode`（用户编号）- 业务唯一标识
    - 新增 `employeeNo`（工号）- 企业内部员工编号
    - 新增 `position`（职位）- 职位信息
@@ -619,7 +673,7 @@ User表是业务实体，应该归属于user模块而非common模块。将user.s
 - 满足企业内部安全审计和合规要求
 
 **相关文件**：
-- `dto/CurrentUser.java`
+- `dto/CurrentUserDTO.java`
 - `dto/OperationLogDTO.java`
 - `entity/OperationLog.java`
 - `aspect/OperationLogAspect.java`

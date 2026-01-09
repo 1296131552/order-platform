@@ -1,7 +1,6 @@
-package com.order.platform.user.dto.response;
+package com.order.platform.user.vo;
 
-import com.order.platform.common.dto.CurrentUser;
-import com.order.platform.user.entity.Role;
+import com.order.platform.common.dto.CurrentUserDTO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -112,7 +111,7 @@ public class LoginVO implements Serializable {
      * - position：职位
      */
     @Schema(description = "当前用户信息")
-    private CurrentUser userInfo;
+    private CurrentUserDTO userInfo;
 
     /**
      * 用户角色列表

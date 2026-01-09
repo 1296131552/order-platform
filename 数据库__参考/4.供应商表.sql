@@ -49,7 +49,7 @@ CREATE TABLE `t_supplier` (
   
   -- ========== 地址信息 ==========
   -- 省份,如:北京市、上海市、广东省
-  `address_province` VARCHAR(50) NOT NULL DEFAULT '' COMMENT '省份',
+`address_province` VARCHAR(50) NOT NULL DEFAULT '' COMMENT '省份',
   -- 城市,如:北京市、上海市、广州市
   `address_city` VARCHAR(50) NOT NULL DEFAULT '' COMMENT '城市',
   -- 区县,如:朝阳区、浦东新区、天河区

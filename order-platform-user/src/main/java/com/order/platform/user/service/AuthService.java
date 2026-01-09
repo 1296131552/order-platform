@@ -2,7 +2,7 @@ package com.order.platform.user.service;
 
 import com.order.platform.user.dto.request.ChangePasswordDTO;
 import com.order.platform.user.dto.request.LoginDTO;
-import com.order.platform.user.dto.response.LoginVO;
+import com.order.platform.user.vo.LoginVO;
 
 /**
  * 认证服务接口
