@@ -43,7 +43,7 @@ jobs:
 
       - name: 🔍 运行 Semgrep 扫描
         id: semgrep
-        uses: returntocorp/semgrep@v2
+        uses: returntocorp/semgrep@v1
         with:
           config: auto  # 使用自动配置，包含所有推荐规则
           # 可选：指定自定义规则
