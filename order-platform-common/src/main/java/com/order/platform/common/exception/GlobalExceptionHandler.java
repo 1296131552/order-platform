@@ -112,8 +112,8 @@ public class GlobalExceptionHandler {
      * @param request HTTP请求
      * @return 统一响应结果
      */
-    @ExceptionHandler(java.sql.DuplicateKeyException.class)
-    public Result<Void> handleDuplicateKeyException(java.sql.DuplicateKeyException e, HttpServletRequest request) {
+    @ExceptionHandler(SQLIntegrityConstraintViolationException.class)
+    public Result<Void> handleDuplicateKeyException(SQLIntegrityConstraintViolationException e, HttpServletRequest request) {
         log.error("数据库唯一索引冲突 [{}]: {}", request.getRequestURI(), e.getMessage(), e);
 
         // 提取异常信息
@@ -155,7 +155,7 @@ public class GlobalExceptionHandler {
             friendlyMessage = "操作失败，数据冲突（" + conflictField + "）";
         }
 
-        return Result.fail(ResponseCode.SYSTEM_ERROR.getCode(), friendlyMessage);
+        return Result.fail(ResponseCode.INTERNAL_ERROR.getCode(), friendlyMessage);
     }
 
     /**
@@ -166,10 +166,18 @@ public class GlobalExceptionHandler {
     private Result<Void> handleSQLIntegrityConstraintViolation(SQLIntegrityConstraintViolationException e, HttpServletRequest request) {
         log.error("SQL约束违反 [{}]: {}", request.getRequestURI(), e.getMessage(), e);
 
-        // 提取约束名称
+        // 提取约束名称（从异常消息中解析）
         String constraintName = null;
         try {
-            constraintName = e.getConstraintName();
+            // MySQL 异常消息格式: "Duplicate entry 'xxx' for key 'uk_username'"
+            String message = e.getMessage();
+            if (message != null && message.contains("for key '")) {
+                int startIdx = message.indexOf("for key '") + 9;
+                int endIdx = message.indexOf("'", startIdx);
+                if (startIdx > 0 && endIdx > startIdx) {
+                    constraintName = message.substring(startIdx, endIdx);
+                }
+            }
         } catch (Exception ex) {
             log.warn("无法提取约束名称", ex);
         }

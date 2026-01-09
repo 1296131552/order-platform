@@ -1,0 +1,44 @@
+# Semgrep 配置文件
+# 文档: https://semgrep.dev/docs/
+
+rules:
+  # 项目自定义规则
+  - include: .semgrep/rules/
+
+  # 使用 Semgrep 社区规则
+  - include: https://semgrep.dev/p/java
+
+  # 排除特定规则（误报规则）
+  - exclude: |
+      - generic.secrets.security.detected-bcrypt-hash.detected-bcrypt-hash
+
+# 配置选项
+options:
+  # 排除测试文件
+  exclude_paths:
+    - '**/test/**'
+    - '**/tests/**'
+    - '**/*.test.*
+
+  # 排除生成的代码
+    - '**/target/**'
+    - '**/generated/**'
+    - '**/build/**'
+
+  # 严重程度过滤
+  severity: WARNING
+
+  # 只显示有意义的修复建议
+  autofix: false
+
+  # 颜色输出
+  colors: true
+
+# 语言配置
+languages:
+  - java
+  - yaml
+  - javascript
+
+# 超时设置（秒）
+timeout: 300
