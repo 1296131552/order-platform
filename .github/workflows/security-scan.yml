@@ -122,12 +122,14 @@ jobs:
                 echo "⚠️ **发现 $RESULTS 个潜在问题**" >> summary.md
                 echo "" >> summary.md
 
-                # 显示前10个问题
+                # 显示前10个问题（优化输出格式）
                 echo '<details>' >> summary.md
                 echo '<summary>🔍 点击查看详细结果（前10个）</summary>' >> summary.md
                 echo "" >> summary.md
                 echo '```' >> summary.md
-                jq -r '.results[:10] | .[] | "\(.message | .[0].text)\n  文件: \(.path):\(.start.line)\n  严重程度: \(.extra.severity // "未知")\n"' reports/semgrep-results/semgrep.json >> summary.md 2>/dev/null || echo "解析失败" >> summary.md
+                jq -r '.results[:10] | .[] as $result |
+                  "\($result.message // "无描述")\n  📁 文件: \($result.path):\($result.start.line)\n  ⚠️ 严重程度: \($result.extra.severity // "UNKNOWN")\n  🔧 检查器: \($result.check_id)\n"' \
+                  reports/semgrep-results/semgrep.json >> summary.md 2>/dev/null || echo "解析失败" >> summary.md
                 echo '```' >> summary.md
                 echo '</details>' >> summary.md
               fi
