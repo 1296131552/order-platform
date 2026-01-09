@@ -11,14 +11,14 @@
 ## 📋 目录
 
 - [1. Git基础概念](#1-git基础概念)
-- [2. 分支管理策略](#2-分支管理策略)
+- [2. 分支管理策略](#2-分支管理策略) 
 - [3. 提交规范](#3-提交规范)
 - [4. 常用命令速查](#4-常用命令速查)
 - [5. 常见问题解决](#5-常见问题解决)
 - [6. 团队协作流程](#6-团队协作流程)
 
 ---
-
+ 
 ## 1. Git基础概念
 
 ### 1.1 什么是Git？
@@ -134,7 +134,7 @@ git checkout -b feature/user-registration
 
 # 2. 在功能分支开发
 git add .
-git commit -m "feat: 添加用户注册功能"
+git commit -m "feat: 添加用户注册功能" 
 
 # 3. 推送功能分支到远程
 git push origin feature/user-registration

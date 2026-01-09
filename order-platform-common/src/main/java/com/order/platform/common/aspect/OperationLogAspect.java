@@ -84,6 +84,8 @@ public class OperationLogAspect {
      * - 方法调用：.method()
      * - 构造器：new
      * - 危险关键字：exec, eval, Runtime, Process 等
+     *
+     * 注意：括号 () 不在这里检测，因为方法调用会被正则表达式检查拒绝
      */
     private static final Set<String> DANGEROUS_PATTERNS = Set.of(
             "T(",           // 类引用（如 T(Math)）
@@ -96,29 +98,38 @@ public class OperationLogAspect {
             "getClass()",   // 反射
             "Class.forName(", // 反射
             "invoke(",      // 反射
-            "System.",      // System类
+            "System.",      // System类（大写S）
+            ".system.",     // system类（小写s，用于检测 #user.system.getProperty）
             "ScriptEngine", // 脚本引擎
             "JavaScript",   // JavaScript
             "<%"            // JSP/EL 注入
     );
 
     /**
-     * 安全的 SpEL 表达式模式（增强版）
+     * 安全的 SpEL 表达式模式（增强版 v2）
      *
      * 允许：
      * - 变量引用：#variableName
      * - 属性访问：#variableName.property
      * - 简单索引：#variableName[0]
      * - 嵌套属性：#user.department.name
+     * - 索引后属性：#items[0].name（支持索引和属性交替）
+     * - Unicode字符：支持中文等Unicode字符作为属性名
      *
      * 禁止：
      * - 方法调用
      * - 类引用
      * - 构造器
      * - 复杂表达式
+     *
+     * 正则说明：
+     * - 使用 UNICODE_CHARACTER_CLASS 标志使 \w 支持 Unicode 字符
+     * - ^#\w+                     : 以 # 开头，后跟字母、数字、下划线（包括Unicode）
+     * - (\[\d+\]|\. \w+)*         : 零次或多次 [数字] 或 .属性名（一个或多个字符）
+     * - \w 在 UNICODE_CHARACTER_CLASS 模式下匹配 Unicode 字母、数字、下划线（包括中文）
      */
     private static final Pattern SAFE_EXPRESSION_PATTERN =
-            Pattern.compile("^#[a-zA-Z_][a-zA-Z0-9_]*(\\.[a-zA-Z_][a-zA-Z0-9_]*)*(\\[[0-9]+\\])?$");
+            Pattern.compile("^#\\w+(\\[\\d+\\]|\\.\\w+)*$", Pattern.UNICODE_CHARACTER_CLASS);
 
     /**
      * SpEL 表达式最大长度限制
@@ -141,47 +152,46 @@ public class OperationLogAspect {
     private final DefaultParameterNameDiscoverer nameDiscoverer = new DefaultParameterNameDiscoverer();
 
     /**
-     * 验证 SpEL 表达式安全性（增强版）
+     * 验证 SpEL 表达式安全性（增强版 v2）
      *
-     * 安全检查：
-     * 1. 长度限制（防止 DoS）
-     * 2. 正则模式验证（只允许安全的表达式格式）
-     * 3. 危险模式黑名单（T()、exec()、eval() 等）
-     * 4. 特殊字符检查（防止绕过）
+     * 安全检查（按顺序执行）：
+     * 1. 空格处理：自动去除前后空格
+     * 2. 长度限制（防止 DoS）
+     * 3. 危险模式黑名单（T()、exec()、eval() 等）- 优先检查，给出准确错误消息
+     * 4. 正则模式验证（只允许安全的表达式格式）
      *
      * @param expressionString 表达式字符串
      * @throws SecurityException 如果表达式不安全
      */
     private void validateExpression(String expressionString) {
-        // 1. 长度检查（防止 DoS）
-        if (expressionString.length() > MAX_EXPRESSION_LENGTH) {
+        // 1. 空格处理：先去除前后空格
+        String trimmed = expressionString.trim();
+        if (!trimmed.equals(expressionString)) {
+            log.debug("SpEL 表达式包含前后空格，已自动去除: original='{}', trimmed='{}'", expressionString, trimmed);
+        }
+
+        // 2. 长度检查（防止 DoS）- 使用 trimmed 版本
+        if (trimmed.length() > MAX_EXPRESSION_LENGTH) {
             log.error("SpEL 表达式过长: length={}, max={}, expression={}",
-                    expressionString.length(), MAX_EXPRESSION_LENGTH, expressionString);
+                    trimmed.length(), MAX_EXPRESSION_LENGTH, trimmed);
             throw new SecurityException("表达式长度超过限制 (最大 " + MAX_EXPRESSION_LENGTH + " 字符)");
         }
 
-        // 2. 正则模式验证（严格的格式检查）
-        if (!SAFE_EXPRESSION_PATTERN.matcher(expressionString).matches()) {
-            log.error("SpEL 表达式格式不符合安全规范: {}", expressionString);
-            throw new SecurityException("表达式格式不符合安全规范，只允许 #variable.property 或 #variable[index] 格式");
-        }
-
-        // 3. 危险模式黑名单检查
+        // 3. 危险模式黑名单检查（优先检查，给出更准确的错误消息）
         for (String dangerous : DANGEROUS_PATTERNS) {
-            if (expressionString.contains(dangerous)) {
-                log.error("检测到危险的 SpEL 表达式: pattern={}, expression={}", dangerous, expressionString);
+            if (trimmed.contains(dangerous)) {
+                log.error("检测到危险的 SpEL 表达式: pattern={}, expression={}", dangerous, trimmed);
                 throw new SecurityException("禁止的危险表达式模式: " + dangerous);
             }
         }
 
-        // 4. 特殊字符检查（防止编码绕过）
-        // 检查是否有非预期的特殊字符
-        String trimmed = expressionString.trim();
-        if (!trimmed.equals(expressionString)) {
-            log.warn("SpEL 表达式包含前后空格，已自动去除: original='{}', trimmed='{}'", expressionString, trimmed);
+        // 4. 正则模式验证（严格的格式检查）
+        if (!SAFE_EXPRESSION_PATTERN.matcher(trimmed).matches()) {
+            log.error("SpEL 表达式格式不符合安全规范: {}", trimmed);
+            throw new SecurityException("表达式格式不符合安全规范，只允许 #variable.property 或 #variable[index] 格式");
         }
 
-        log.debug("SpEL 表达式验证通过: {}", expressionString);
+        log.debug("SpEL 表达式验证通过: {}", trimmed);
     }
 
     /**

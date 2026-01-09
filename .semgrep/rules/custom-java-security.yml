@@ -1,0 +1,145 @@
+# 自定义 Java 安全规则
+# 针对订单可视化平台项目的特定安全检查
+
+rules:
+  # 规则1：禁止在日志中输出敏感信息
+  - id: custom.java.logging-sensitive-data
+    message: >-
+      日志中可能包含敏感信息（密码、token、身份证等），
+      请确保已脱敏或使用占位符
+    languages: [java]
+    severity: WARNING
+    mode: taint
+    pattern-sources:
+      - pattern: password
+      - pattern: token
+      - pattern: secret
+      - pattern: apiKey
+      - pattern: idCard
+    pattern-sinks:
+      - pattern: log.info(...)
+      - pattern: log.debug(...)
+      - pattern: log.error(...)
+    metadata:
+      category: security
+      technology:
+        - java
+        - logging
+      owasp: "A09:2021 - Security Logging and Monitoring Failures"
+      cwe:
+        - "CWE-532: Insertion of Sensitive Information into Log File"
+
+  # 规则2：SQL 查询必须使用参数化
+  - id: custom.java.sql-injection-risk
+    message: >-
+      检测到字符串拼接的 SQL 查询，存在 SQL 注入风险。
+      请使用 MyBatis 的 #{} 参数绑定或 PreparedStatement
+    languages: [java]
+    severity: ERROR
+    patterns:
+      - pattern-regex: '["\'].*SELECT.*["\']\s*\+'
+      - pattern-regex: '["\'].*INSERT.*["\']\s*\+'
+      - pattern-regex: '["\'].*UPDATE.*["\']\s*\+'
+      - pattern-regex: '["\'].*DELETE.*["\']\s*\+'
+    metadata:
+      category: security
+      technology:
+        - java
+        - sql
+        - mybatis
+      owasp: "A03:2021 - Injection"
+      cwe:
+        - "CWE-89: SQL Injection"
+
+  # 规则3：禁止硬编码的加密密钥
+  - id: custom.java.hardcoded-crypto-key
+    message: >-
+      检测到硬编码的加密密钥。密钥应从环境变量或配置中心读取。
+    languages: [java]
+    severity: ERROR
+    pattern-either:
+      - pattern: |
+          String $KEY = "...";
+          encrypt($KEY, ...);
+      - pattern: |
+          private static final String KEY = "...";
+          AES.$KEY
+    metadata:
+      category: security
+      technology:
+        - java
+        - cryptography
+      owasp: "A02:2021 - Cryptographic Failures"
+      cwe:
+        - "CWE-321: Use of Hard-coded Cryptographic Key"
+
+  # 规则4：JWT Token 必须设置过期时间
+  - id: custom.java.jwt-without-expiration
+    message: >-
+      JWT Token 未设置过期时间或过期时间过长（建议不超过 24 小时）
+    languages: [java]
+    severity: WARNING
+    pattern: |
+      Jwts.builder()
+        ...setSubject(...))
+        ...compact();
+    metadata:
+      category: security
+      technology:
+        - java
+        - jwt
+      owasp: "A07:2021 - Identification and Authentication Failures"
+      cwe:
+        - "CWE-613: Insufficient Session Expiration"
+
+  # 规则5：禁止使用 DES 加密（不安全）
+  - id: custom.java.weak-encryption-des
+    message: >-
+      DES 加密算法已被证明不安全，请使用 AES-256 或更强大的算法
+    languages: [java]
+    severity: ERROR
+    pattern: Cipher.getInstance("DES")
+    metadata:
+      category: security
+      technology:
+        - java
+        - cryptography
+      owasp: "A02:2021 - Cryptographic Failures"
+      cwe:
+        - "CWE-327: Use of a Broken or Risky Cryptographic Algorithm"
+
+  # 规则6：HTTP 客户端必须设置超时
+  - id: custom.java.httpclient-no-timeout
+    message: >-
+      HTTP 客户端未设置超时时间，可能导致请求无限期挂起
+    languages: [java]
+    severity: WARNING
+    pattern: |
+      new HttpClient()
+        ...timeout(...);
+    metadata:
+      category: reliability
+      technology:
+        - java
+        - http
+      cwe:
+        - "CWE-1088: Synchronous Access of Resource without Expiration"
+
+  # 规则7：敏感操作必须记录操作日志
+  - id: custom.java.sensitive-operation-no-log
+    message: >-
+      敏感操作（删除、批量更新）缺少操作日志注解 @OperationLog
+    languages: [java]
+    severity: WARNING
+    pattern: |
+      @DeleteMapping
+      @PostMapping(...delete...)
+      public $RET $METHOD(...) {
+        ...
+      }
+    metadata:
+      category: security
+      technology:
+        - java
+        - spring
+      owasp: "A09:2021 - Security Logging and Monitoring Failures"
