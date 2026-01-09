@@ -38,3 +38,16 @@ application-local.yml
 .claude/
 ig/
 nul
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+dist/
+.DS_Store
+
+# 前端测试项目
+order-fronted-test/node_modules/
+order-fronted-test/example.zip
+
