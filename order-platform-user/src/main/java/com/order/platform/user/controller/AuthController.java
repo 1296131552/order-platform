@@ -1,7 +1,7 @@
 package com.order.platform.user.controller;
 
 import com.order.platform.common.annotation.OperationLog;
-import com.order.platform.common.dto.CurrentUser;
+import com.order.platform.common.dto.CurrentUserDTO;
 import com.order.platform.common.enums.BusinessType;
 import com.order.platform.common.enums.OperationModule;
 import com.order.platform.common.enums.OperationType;
@@ -9,7 +9,7 @@ import com.order.platform.common.holder.CurrentUserHolder;
 import com.order.platform.common.response.Result;
 import com.order.platform.user.dto.request.ChangePasswordDTO;
 import com.order.platform.user.dto.request.LoginDTO;
-import com.order.platform.user.dto.response.LoginVO;
+import com.order.platform.user.vo.LoginVO;
 import com.order.platform.user.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -203,7 +203,7 @@ public class AuthController {
     public Result<Void> changePassword(@Valid @RequestBody ChangePasswordDTO changePasswordDTO,
                                         HttpServletRequest request) {
         // 从 ThreadLocal 获取当前登录用户（AuthInterceptor 已将用户信息存入）
-        CurrentUser currentUser = CurrentUserHolder.get();
+        CurrentUserDTO currentUser = CurrentUserHolder.get();
         if (currentUser == null) {
             return Result.error("用户未登录");
         }

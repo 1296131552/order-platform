@@ -501,7 +501,6 @@ public void consumeInviteCode(String code) {
 ## 七、联系人和支持
 
 - **开发负责人**：开发组
-- **技术支持**：Claude Code
 - **文档维护**：保持与代码同步更新
 
 ---

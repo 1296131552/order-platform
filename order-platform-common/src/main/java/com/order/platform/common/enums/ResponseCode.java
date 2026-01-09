@@ -27,6 +27,8 @@ public enum ResponseCode {
     USER_LOCKED(1008, "账户已锁定"),
     PASSWORD_ERROR(1009, "密码错误"),
     PASSWORD_EXPIRED(1010, "密码已过期"),
+    EMAIL_ALREADY_EXISTS(1011, "邮箱已存在"),
+    PHONE_ALREADY_EXISTS(1012, "手机号已存在"),
 
     // 订单相关 2000-2999
     ORDER_NOT_FOUND(2001, "订单不存在"),

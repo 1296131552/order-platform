@@ -1,6 +1,6 @@
 package com.order.platform.common.holder;
 
-import com.order.platform.common.dto.CurrentUser;
+import com.order.platform.common.dto.CurrentUserDTO;
 
 /**
  * 当前登录用户信息持有者
@@ -20,7 +20,7 @@ import com.order.platform.common.dto.CurrentUser;
  * {@code
  * // 在 Service 中获取当前用户
  * public void createOrder(Order order) {
- *     CurrentUser user = CurrentUserHolder.get();
+ *     CurrentUserDTO user = CurrentUserHolder.get();
  *     order.setCreateBy(user.getId());
  *     order.setCreateByName(user.getUsername());
  *     // ...
@@ -32,14 +32,14 @@ import com.order.platform.common.dto.CurrentUser;
  */
 public class CurrentUserHolder {
 
-    private static final ThreadLocal<CurrentUser> USER_THREAD_LOCAL = new ThreadLocal<>();
+    private static final ThreadLocal<CurrentUserDTO> USER_THREAD_LOCAL = new ThreadLocal<>();
 
     /**
      * 设置当前用户信息
      *
      * @param user 当前用户
      */
-    public static void set(CurrentUser user) {
+    public static void set(CurrentUserDTO user) {
         USER_THREAD_LOCAL.set(user);
     }
 
@@ -48,7 +48,7 @@ public class CurrentUserHolder {
      *
      * @return 当前用户，未登录返回 null
      */
-    public static CurrentUser get() {
+    public static CurrentUserDTO get() {
         return USER_THREAD_LOCAL.get();
     }
 
@@ -58,7 +58,7 @@ public class CurrentUserHolder {
      * @return 用户ID，未登录返回 null
      */
     public static Long getUserId() {
-        CurrentUser user = get();
+        CurrentUserDTO user = get();
         return user != null ? user.getId() : null;
     }
 
@@ -68,7 +68,7 @@ public class CurrentUserHolder {
      * @return 用户名，未登录返回 null
      */
     public static String getUsername() {
-        CurrentUser user = get();
+        CurrentUserDTO user = get();
         return user != null ? user.getUsername() : null;
     }
 

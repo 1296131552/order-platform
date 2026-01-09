@@ -30,6 +30,9 @@
         <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
+        <!-- Spring Boot 版本 -->
+        <spring-boot.version>3.2.1</spring-boot.version>
+
         <!-- 依赖版本 -->
         <mybatis-plus.version>3.5.5</mybatis-plus.version>
         <druid.version>1.2.20</druid.version>
@@ -82,7 +85,7 @@
                 <artifactId>jjwt-api</artifactId>
                 <version>${jwt.version}</version>
             </dependency>
-            <dependency>
+        <dependency>
                 <groupId>io.jsonwebtoken</groupId>
                 <artifactId>jjwt-impl</artifactId>
                 <version>${jwt.version}</version>
@@ -100,6 +103,13 @@
                 <groupId>com.github.xiaoymin</groupId>
                 <artifactId>knife4j-openapi3-jakarta-spring-boot-starter</artifactId>
                 <version>${knife4j.version}</version>
+            </dependency>
+
+            <!-- Redis -->
+            <dependency>
+            <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-data-redis</artifactId>
+                <version>${spring-boot.version}</version>
             </dependency>
 
             <!-- Lombok -->

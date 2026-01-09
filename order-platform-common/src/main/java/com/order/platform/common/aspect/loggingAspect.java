@@ -41,7 +41,7 @@ public class LoggingAspect {
     public Object around(ProceedingJoinPoint joinPoint) throws Throwable {
         long startTime = System.currentTimeMillis();
 
-        // 获取请求信息
+        // 获取请求信息       
         ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
         if (attributes == null) {
             return joinPoint.proceed();

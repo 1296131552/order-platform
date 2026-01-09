@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 import java.util.List;
 
 /**
- * 当前登录用户信息
+ * 当前登录用户信息DTO
  *
  * 用于在请求上下文中传递用户信息
  *
@@ -24,7 +24,7 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CurrentUser {
+public class CurrentUserDTO {
 
     /**
      * 用户ID

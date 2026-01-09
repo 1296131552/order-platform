@@ -1,7 +1,7 @@
 package com.order.platform.common.interceptor;
 
 import com.order.platform.common.annotation.RequireLogin;
-import com.order.platform.common.dto.CurrentUser;
+import com.order.platform.common.dto.CurrentUserDTO;
 import com.order.platform.common.enums.ResponseCode;
 import com.order.platform.common.exception.BusinessException;
 import com.order.platform.common.holder.CurrentUserHolder;
@@ -18,6 +18,7 @@ import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
+import org.springframework.data.redis.core.StringRedisTemplate;
 
 import java.lang.reflect.Method;
 import java.util.Collections;
@@ -29,15 +30,17 @@ import java.util.List;
  * 功能说明：
  * - 拦截带有 @RequireLogin 注解的接口（支持方法级别和类级别）
  * - 验证请求头中的 Authorization Token（支持 bearer/Bearer/BEARER）
+ * - 检查 Token 黑名单（防止退出登录后重用）
  * - 解析用户信息并存入 ThreadLocal（混合方案获取角色）
  * - 请求结束后清理 ThreadLocal，防止内存泄漏
  *
  * 工作流程：
  * 1. 请求到达 → 判断方法或类是否有 @RequireLogin 注解
  * 2. 有注解 → 从请求头获取 Token
- * 3. 验证 Token → 解析用户信息 → 获取角色（混合方案）→ 存入 ThreadLocal
- * 4. 请求处理 → 业务代码通过 CurrentUserHolder 获取用户
- * 5. 请求结束 → afterCompletion 清理 ThreadLocal
+ * 3. 检查 Token 黑名单（Redis）→ 验证 Token → 解析用户信息
+ * 4. 获取角色（混合方案）→ 存入 ThreadLocal
+ * 5. 请求处理 → 业务代码通过 CurrentUserHolder 获取用户
+ * 6. 请求结束 → afterCompletion 清理 ThreadLocal
  *
  * 请求头格式：
  * Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
@@ -48,6 +51,7 @@ import java.util.List;
  * - afterCompletion 作为二次保障兜底清理
  *
  * 异常处理策略：
+ * - Token 在黑名单中（已退出登录）→ UNAUTHORIZED
  * - Token 格式错误/签名失败 → TOKEN_INVALID
  * - Token 过期 → TOKEN_EXPIRED
  * - Token 为空/格式异常 → UNAUTHORIZED
@@ -58,8 +62,15 @@ import java.util.List;
  * 2. Token 中无角色时，从数据库查询（实时性最好）
  * 3. 数据库查询失败时，使用默认角色 USER（兜底保障）
  *
+ * Token 黑名单机制：
+ * - 用户退出登录时，Token 被加入 Redis 黑名单
+ * - 黑名单 Key 格式：token:blacklist:{token}
+ * - 黑名单过期时间：与 Token 过期时间一致（7天）
+ * - 如果 Redis 未配置，跳过黑名单检查（降级策略）
+ *
  * 依赖说明：
  * - UserRoleProvider 为可选依赖（required = false）
+ * - StringRedisTemplate 为可选依赖（required = false）
  * - 如果未注入（user 模块未加载），启动时会打印 WARN 日志
  * - 此时角色获取会跳过数据库查询，直接使用默认角色
  *
@@ -73,6 +84,7 @@ import java.util.List;
  * - ✅ 增强日志空值告警
  * - ✅ Token 前缀大小写兼容（bearer/Bearer/BEARER）
  * - ✅ UserRoleProvider 初始化校验（启动时健康检查）
+ * - ✅ Token 黑名单检查（Redis）
  *
  * @since 1.0.0
  */
@@ -82,17 +94,21 @@ public class AuthInterceptor implements HandlerInterceptor {
 
     private final JwtUtil jwtUtil;
     private final UserRoleProvider userRoleProvider;
+    private final StringRedisTemplate redisTemplate;
 
     /**
-     * 构造函数（支持 UserRoleProvider 可选依赖）
+     * 构造函数（支持可选依赖）
      *
      * @param jwtUtil          JWT 工具类（必需）
      * @param userRoleProvider 用户角色提供者（可选，如果为 null 则跳过数据库查询）
+     * @param redisTemplate    Redis 模板（可选，如果为 null 则跳过黑名单检查）
      */
     public AuthInterceptor(JwtUtil jwtUtil,
-                          @org.springframework.beans.factory.annotation.Autowired(required = false) UserRoleProvider userRoleProvider) {
+                          @org.springframework.beans.factory.annotation.Autowired(required = false) UserRoleProvider userRoleProvider,
+                          @org.springframework.beans.factory.annotation.Autowired(required = false) StringRedisTemplate redisTemplate) {
         this.jwtUtil = jwtUtil;
         this.userRoleProvider = userRoleProvider;
+        this.redisTemplate = redisTemplate;
 
         // 【启动时健康检查】提前暴露配置问题
         if (this.userRoleProvider == null) {
@@ -168,7 +184,7 @@ public class AuthInterceptor implements HandlerInterceptor {
             List<String> roles = getUserRoles(token, validationResult.userId, request.getRequestURI());
 
             // 8. 构建当前用户信息
-            CurrentUser currentUser = CurrentUser.builder()
+            CurrentUserDTO currentUser = CurrentUserDTO.builder()
                     .id(validationResult.userId)
                     .username(validationResult.username)
                     .roles(roles)
@@ -295,7 +311,18 @@ public class AuthInterceptor implements HandlerInterceptor {
      */
     private TokenValidationResult validateAndParseToken(String token, String uri) {
         try {
-            // 直接解析用户信息（可能抛出 JWT 格式异常）
+            // 1. 检查 Token 黑名单（防止退出登录后重用）
+            if (redisTemplate != null) {
+                String blacklistKey = "token:blacklist:" + token;
+                Boolean isBlacklisted = redisTemplate.hasKey(blacklistKey);
+
+                if (Boolean.TRUE.equals(isBlacklisted)) {
+                    log.warn("Token 已失效（退出登录）: {}", uri);
+                    throw new BusinessException(ResponseCode.UNAUTHORIZED, "Token已失效，请重新登录");
+                }
+            }
+
+            // 2. 解析用户信息（可能抛出 JWT 格式异常）
             Long userId = jwtUtil.getUserIdFromToken(token);
             String username = jwtUtil.getUsernameFromToken(token);
 
