@@ -58,10 +58,10 @@ public class PageResult<T> {
      * 从 MyBatis-Plus Page 对象构建分页响应
      *
      * @param page MyBatis-Plus 分页对象
-     * @param  实体类型
+     * @param <T> 实体类型
      * @return 分页响应对象
      */
-    public static  PageResult of(Page page) {
+    public static <T> PageResult<T> of(Page<T> page) {
         return new PageResult<>(
                 page.getRecords(),
                 page.getTotal(),
@@ -82,10 +82,10 @@ public class PageResult<T> {
      * @param total   总记录数
      * @param current 当前页码
      * @param size    每页大小
-     * @param  实体类型
+     * @param <T>     实体类型
      * @return 分页响应对象
      */
-    public static  PageResult of(List records, long total, long current, long size) {
+    public static <T> PageResult<T> of(List<T> records, long total, long current, long size) {
         // 计算总页数
         long pages = (total + size - 1) / size;
         return new PageResult<>(records, total, current, size, pages);
@@ -94,11 +94,11 @@ public class PageResult<T> {
     /**
      * 空分页响应（用于查询无结果时）
      *
-     * @param  实体类型
+     * @param <T> 实体类型
      * @return 空分页响应对象
      */
     @SuppressWarnings("unchecked")
-    public static  PageResult empty() {
+    public static <T> PageResult<T> empty() {
         return new PageResult<>(List.of(), 0, 1, 10, 0);
     }
 }

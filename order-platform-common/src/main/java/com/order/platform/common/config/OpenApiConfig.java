@@ -104,15 +104,27 @@ public class OpenApiConfig {
     }
 
     /**
-     * 用户模块 API 分组
+     * 用户管理 API 分组（/api/users/**）
      */
     @Bean
-    public GroupedOpenApi userApi() {
+    public GroupedOpenApi usersApi() {
         return GroupedOpenApi.builder()
-                .group("02-用户模块")
-                .pathsToMatch("/api/user/**")
+                .group("02-用户管理")
+                .pathsToMatch("/api/users/**")
                 .build();
     }
+
+    /**
+     * 用户模块 API 分组（/api/user/**）
+     * 注意：当前项目中使用的是 /api/users/**，此分组预留
+     */
+    /*@Bean
+    public GroupedOpenApi userApi() {
+        return GroupedOpenApi.builder()
+                .group("03-用户模块")
+                .pathsToMatch("/api/user/**")
+                .build();
+    }*/
 
     /**
      * 订单模块 API 分组
