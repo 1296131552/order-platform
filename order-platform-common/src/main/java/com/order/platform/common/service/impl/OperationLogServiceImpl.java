@@ -52,6 +52,10 @@ public class OperationLogServiceImpl implements OperationLogService {
             if (entity.getIsDeleted() == null) {
                 entity.setIsDeleted(0);
             }
+            // businessId 为空时设置默认值 0（表示无关联业务）
+            if (entity.getBusinessId() == null) {
+                entity.setBusinessId(0L);
+            }
 
             // 3. 处理数据快照（暂时存入 extra_info）
             if (StrUtil.isNotBlank(logDTO.getBeforeData()) || StrUtil.isNotBlank(logDTO.getAfterData())) {

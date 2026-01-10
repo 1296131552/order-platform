@@ -313,12 +313,19 @@ public class AuthInterceptor implements HandlerInterceptor {
         try {
             // 1. 检查 Token 黑名单（防止退出登录后重用）
             if (redisTemplate != null) {
-                String blacklistKey = "token:blacklist:" + token;
-                Boolean isBlacklisted = redisTemplate.hasKey(blacklistKey);
+                try {
+                    String blacklistKey = "token:blacklist:" + token;
+                    Boolean isBlacklisted = redisTemplate.hasKey(blacklistKey);
 
-                if (Boolean.TRUE.equals(isBlacklisted)) {
-                    log.warn("Token 已失效（退出登录）: {}", uri);
-                    throw new BusinessException(ResponseCode.UNAUTHORIZED, "Token已失效，请重新登录");
+                    if (Boolean.TRUE.equals(isBlacklisted)) {
+                        log.warn("Token 已失效（退出登录）: {}", uri);
+                        throw new BusinessException(ResponseCode.UNAUTHORIZED, "Token已失效，请重新登录");
+                    }
+                } catch (BusinessException e) {
+                    throw e;  // 业务异常继续抛出
+                } catch (Exception e) {
+                    // Redis 连接失败时，跳过黑名单检查（降级策略）
+                    log.warn("Redis 连接失败，跳过 Token 黑名单检查: {}", e.getMessage());
                 }
             }
 

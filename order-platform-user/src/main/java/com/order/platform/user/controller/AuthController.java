@@ -1,6 +1,7 @@
 package com.order.platform.user.controller;
 
 import com.order.platform.common.annotation.OperationLog;
+import com.order.platform.common.annotation.RequireLogin;
 import com.order.platform.common.dto.CurrentUserDTO;
 import com.order.platform.common.enums.BusinessType;
 import com.order.platform.common.enums.OperationModule;
@@ -198,6 +199,7 @@ public class AuthController {
      * @return 操作结果
      */
     @PostMapping("/change-password")
+    @RequireLogin
     @Operation(summary = "修改密码", description = "用户修改自己的密码")
     @OperationLog(module = OperationModule.USER, type = OperationType.UPDATE, description = "修改密码")
     public Result<Void> changePassword(@Valid @RequestBody ChangePasswordDTO changePasswordDTO,
