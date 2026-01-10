@@ -11,16 +11,16 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
-import java.util.Arrays;
-
 /**
- * 日志切面
+ * 日志切面（简化版）
  *
  * 功能说明：
- * - 记录所有Controller层的请求信息
- * - 记录请求参数、响应时间、响应结果
+ * - 记录所有 Controller 层的请求和响应
+ * - 记录请求方法、URL、参数、响应时间
  * - 记录异常信息
- * 
+ *
+ * @author 开发组
+ * @since 1.0.0
  */
 @Slf4j
 @Aspect
@@ -41,7 +41,7 @@ public class LoggingAspect {
     public Object around(ProceedingJoinPoint joinPoint) throws Throwable {
         long startTime = System.currentTimeMillis();
 
-        // 获取请求信息       
+        // 获取请求信息
         ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
         if (attributes == null) {
             return joinPoint.proceed();
@@ -54,159 +54,112 @@ public class LoggingAspect {
         String className = signature.getDeclaringType().getSimpleName();
         String methodName = signature.getName();
 
-        // 构建请求日志
-        StringBuilder requestLog = new StringBuilder();
-        requestLog.append("\n=================== 请求开始 ===================\n");
-        requestLog.append(String.format("请求URL: %s %s\n", request.getMethod(), request.getRequestURI()));
-        requestLog.append(String.format("请求方法: %s.%s\n", className, methodName));
-        requestLog.append(String.format("请求参数: %s\n", Arrays.toString(joinPoint.getArgs())));
-        requestLog.append(String.format("来源IP: %s\n", getClientIp(request)));
-        requestLog.append("================================================");
+        // 构建简洁的请求日志
+        log.info("→ 请求: {} {} -> {}.{}, 参数: {}",
+            request.getMethod(),
+            request.getRequestURI(),
+            className,
+            methodName,
+            formatArguments(joinPoint.getArgs())
+        );
 
-        log.info(requestLog.toString());
-
-        Object result = null;
         try {
             // 执行方法
-            result = joinPoint.proceed();
+            Object result = joinPoint.proceed();
 
             // 计算执行时间
-            long endTime = System.currentTimeMillis();
-            long executeTime = endTime - startTime;
+            long executeTime = System.currentTimeMillis() - startTime;
 
             // 构建响应日志
-            StringBuilder responseLog = new StringBuilder();
-            responseLog.append("\n=================== 响应结果 ===================\n");
-            responseLog.append(String.format("请求方法: %s.%s\n", className, methodName));
-            responseLog.append(String.format("执行耗时: %dms\n", executeTime));
-            responseLog.append(String.format("响应内容: %s\n", formatResult(result)));
-            responseLog.append("================================================");
+            log.info("← 响应: {}.{} - 耗费: {}ms, 结果: {}",
+                className,
+                methodName,
+                executeTime,
+                formatResult(result)
+            );
 
-            // 如果执行时间过长，记录警告
-            if (executeTime > 3000) {
-                log.warn("⚠️  {}", responseLog.toString());
-            } else {
-                log.info("✅ {}", responseLog.toString());
+            // 慢请求警告
+            if (executeTime > 2000) {
+                log.warn("⚠️  慢请求: {}.{} 耗费 {}ms", className, methodName, executeTime);
             }
 
             return result;
+
         } catch (Exception e) {
             // 计算执行时间
-            long endTime = System.currentTimeMillis();
-            long executeTime = endTime - startTime;
+            long executeTime = System.currentTimeMillis() - startTime;
 
             // 构建异常日志
-            StringBuilder errorLog = new StringBuilder();
-            errorLog.append(String.format("❌ 请求异常 - %s.%s - 耗时: %dms\n", className, methodName, executeTime));
-            errorLog.append(String.format("异常类型: %s\n", e.getClass().getName()));
-            errorLog.append(String.format("异常信息: %s", e.getMessage()));
+            log.error("✗ 异常: {} {} -> {}.{} - 耗费: {}ms, 错误: {}",
+                request.getMethod(),
+                request.getRequestURI(),
+                className,
+                methodName,
+                executeTime,
+                e.getMessage(),
+                e
+            );
 
-            log.error(errorLog.toString(), e);
             throw e;
         }
     }
 
     /**
-     * 获取客户端真实IP
+     * 格式化方法参数（简化版）
      */
-    private String getClientIp(HttpServletRequest request) {
-        String ip = request.getHeader("X-Forwarded-For");
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("X-Real-IP");
+    private String formatArguments(Object[] args) {
+        if (args == null || args.length == 0) {
+            return "无";
         }
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("Proxy-Client-IP");
+
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < args.length; i++) {
+            if (i > 0) {
+                sb.append(", ");
+            }
+
+            Object arg = args[i];
+            if (arg == null) {
+                sb.append("null");
+            } else if (arg instanceof HttpServletRequest) {
+                sb.append("HttpServletRequest");
+            } else if (arg instanceof jakarta.servlet.http.HttpServletResponse) {
+                sb.append("HttpServletResponse");
+            } else {
+                // 简化显示：类名 + @ + hashCode
+                String className = arg.getClass().getSimpleName();
+                sb.append(className).append("@").append(Integer.toHexString(arg.hashCode()));
+            }
         }
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("WL-Proxy-Client-IP");
-        }
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getRemoteAddr();
-        }
-        // 多个代理的情况，取第一个IP
-        if (ip != null && ip.contains(",")) {
-            ip = ip.split(",")[0].trim();
-        }
-        return ip;
+
+        return sb.toString();
     }
 
     /**
-     * 格式化响应结果，避免日志过长
+     * 格式化响应结果（简化版）
      */
     private String formatResult(Object result) {
         if (result == null) {
             return "null";
         }
 
-        // 使用反射获取 Result 对象的实际内容
         try {
+            // 尝试获取 Result 对象的 code 和 message
             Class<?> resultClass = result.getClass();
-
-            // 获取 code 字段
             Object code = getField(result, resultClass, "code");
-            // 获取 message 字段
             Object message = getField(result, resultClass, "message");
-            // 获取 data 字段
-            Object data = getField(result, resultClass, "data");
 
-            StringBuilder sb = new StringBuilder();
-            sb.append("Result{code=").append(code)
-              .append(", message=").append(message);
-
-            // 格式化 data 内容
-            if (data != null) {
-                String dataStr = formatData(data);
-                sb.append(", data=").append(dataStr);
+            if (code != null) {
+                return "Result{code=" + code + ", message=" + message + "}";
             }
 
-            sb.append("}");
-
-            // 限制最大长度
-            String resultStr = sb.toString();
-            if (resultStr.length() > 1000) {
-                return resultStr.substring(0, 1000) + "... (总长度: " + resultStr.length() + ")";
-            }
-            return resultStr;
+            // 其他对象简化显示
+            String className = resultClass.getSimpleName();
+            return className + "@" + Integer.toHexString(result.hashCode());
 
         } catch (Exception e) {
-            // 如果反射失败，使用默认 toString
-            String resultStr = result.toString();
-            if (resultStr.length() > 1000) {
-                return resultStr.substring(0, 1000) + "... (总长度: " + resultStr.length() + ")";
-            }
-            return resultStr;
+            return result.toString();
         }
-    }
-
-    /**
-     * 格式化 data 内容
-     */
-    private String formatData(Object data) {
-        if (data == null) {
-            return "null";
-        }
-
-        // 处理 Page 对象
-        if (data.getClass().getName().contains("Page")) {
-            Object total = getField(data, data.getClass(), "total");
-            Object records = getField(data, data.getClass(), "records");
-            String recordType = records instanceof java.util.Collection ?
-                "[" + ((java.util.Collection<?>) records).size() + " 条记录]" : "records";
-            return "Page{total=" + total + ", records=" + recordType + "}";
-        }
-
-        // 处理集合
-        if (data instanceof java.util.Collection) {
-            int size = ((java.util.Collection<?>) data).size();
-            if (size > 3) {
-                return "Collection[" + size + " 个元素] (示例: " +
-                    ((java.util.Collection<?>) data).iterator().next() + ", ...)";
-            }
-            return data.toString();
-        }
-
-        // 其他对象直接返回 toString
-        return data.toString();
     }
 
     /**
