@@ -5,6 +5,8 @@ import com.order.platform.common.dto.CurrentUserDTO;
 import com.order.platform.common.enums.BusinessType;
 import com.order.platform.common.enums.OperationModule;
 import com.order.platform.common.enums.OperationType;
+import com.order.platform.common.enums.ResponseCode;
+import com.order.platform.common.exception.BusinessException;
 import com.order.platform.common.holder.CurrentUserHolder;
 import com.order.platform.common.response.Result;
 import com.order.platform.user.dto.request.ChangePasswordDTO;
@@ -165,13 +167,28 @@ public class AuthController {
      * @return 新Token
      */
     @PostMapping("/refresh")
-    @Operation(summary = "刷新Token", description = "使用旧Token换取新Token")
+    @Operation(summary = "刷新Token", description = "使用旧Token换取新Token（需要 Authorization: Bearer 格式）")
     @OperationLog(module = OperationModule.USER, type = OperationType.OTHER, description = "刷新Token")
     public Result<String> refreshToken(HttpServletRequest request) {
+        // 1. 提取 Token
         String oldToken = extractToken(request);
+
+        // 2. 安全检查：Token 不能为空
+        if (oldToken == null || oldToken.isEmpty()) {
+            log.warn("Token 刷新失败：Token 为空或格式错误，要求使用 Authorization: Bearer <token> 格式");
+            throw new BusinessException(ResponseCode.UNAUTHORIZED, "Token 不能为空，请使用 Authorization: Bearer <token> 格式");
+        }
+
+        // 3. 记录刷新请求（审计）
+        String clientIp = getClientIp(request);
+        log.info("收到 Token 刷新请求，clientIp={}", clientIp);
+
+        // 4. 调用 Service 刷新 Token（包含验证逻辑）
         String newToken = authService.refreshToken(oldToken);
 
-        log.info("Token刷新成功");
+        // 5. 记录成功日志（审计）
+        log.info("Token 刷新成功，clientIp={}", clientIp);
+
         return Result.success(newToken);
     }
 
@@ -280,14 +297,50 @@ public class AuthController {
     // ==================== 私有方法 ====================
 
     /**
-     * 从请求中提取Token
+     * 从请求中提取 Token（仅支持标准 Authorization: Bearer 格式）
+     *
+     * 安全说明：
+     * - 只接受 Authorization: Bearer <token> 格式（符合 RFC 6750）
+     * - Token 不会出现在 URL 或日志中
+     * - 符合 OAuth 2.0 / JWT 最佳实践
+     *
+     * 为什么不支持其他方式：
+     * - ❌ 自定义 token 头：不符合安全标准，易与业务参数混淆
+     * - ❌ 请求参数：会被记录在浏览器历史、服务器日志、代理日志中
+     *
+     * 前端调用示例：
+     * fetch('/api/auth/refresh', {
+     *   headers: {
+     *     'Authorization': `Bearer ${token}`
+     *   }
+     * })
+     *
+     * @param request HTTP 请求
+     * @return Token 字符串，格式错误返回 null
      */
     private String extractToken(HttpServletRequest request) {
         String authorization = request.getHeader("Authorization");
-        if (authorization == null || !authorization.toLowerCase().startsWith("bearer ")) {
+
+        // 严格验证格式
+        if (authorization == null) {
+            log.warn("Token 缺失：请求头中缺少 Authorization");
             return null;
         }
-        return authorization.substring(7);
+
+        if (!authorization.startsWith("Bearer ")) {
+            log.warn("Token 格式错误：Authorization 必须以 'Bearer ' 开头，实际: {}", authorization.substring(0, Math.min(20, authorization.length())));
+            return null;
+        }
+
+        String token = authorization.substring(7);
+
+        // 验证 Token 不为空
+        if (token.isEmpty()) {
+            log.warn("Token 为空：Bearer 后没有 token 值");
+            return null;
+        }
+
+        return token;
     }
 
     /**
