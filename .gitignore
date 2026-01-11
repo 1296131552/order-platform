@@ -34,10 +34,17 @@ Thumbs.db
 application-dev.yml
 application-local.yml
 
-# Claude Code
+# Claude Code & AI Tools
 .claude/
 ig/
 nul
+CLAUDE.md
+.claude*
+*claude*
+*.claude
+ai-chat-history/
+ai-logs/
+.ai/
 
 # Node.js
 node_modules/
@@ -51,3 +58,4 @@ dist/
 order-fronted-test/node_modules/
 order-fronted-test/example.zip
 
+注册参考代码
