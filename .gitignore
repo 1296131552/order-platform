@@ -38,7 +38,6 @@ application-local.yml
 .claude/
 ig/
 nul
-CLAUDE.md
 .claude*
 *claude*
 *.claude
