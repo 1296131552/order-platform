@@ -9,7 +9,8 @@
       "Bash(grep:*)",
       "Bash(for:*)",
       "Bash(done)",
-      "Bash(fi:*)"
+      "Bash(fi:*)",
+      "Bash(mvn clean compile:*)"
     ]
   }
 }
