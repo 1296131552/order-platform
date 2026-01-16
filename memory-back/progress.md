@@ -9,7 +9,7 @@
 1. **Maven 多模块项目骨架**
    - 父 POM：统一管理 10 个子模块
    - 10 个子模块：api, common, order, shipment, partner, dashboard, attachment, exception, user, visualization
-
+ 
 2. **公共模块基础类**
    - `Result<T>`：统一响应封装
    - `ResponseCode`：响应码枚举（含订单、发运、合作方等模块码段）

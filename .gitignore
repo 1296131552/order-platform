@@ -43,3 +43,9 @@ logs/
 *.tmp
 *.temp
 *.cache
+nul
+
+# AI
+documents/
+.vscode/
+.claude/
