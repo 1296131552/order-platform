@@ -49,3 +49,21 @@ nul
 documents/
 .vscode/
 .claude/
+
+# 环境变量（敏感！）
+.env
+.env.local
+.env.*.local
+
+# Vite 缓存
+.vite/
+
+# TypeScript 构建信息
+*.tsbuildinfo
+
+# 前端测试覆盖率
+coverage/
+.nyc_output/
+
+# ESLint 缓存
+.eslintcache
