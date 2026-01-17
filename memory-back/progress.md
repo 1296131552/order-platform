@@ -9,7 +9,7 @@
 1. **Maven 多模块项目骨架**
    - 父 POM：统一管理 10 个子模块
    - 10 个子模块：api, common, order, shipment, partner, dashboard, attachment, exception, user, visualization
- 
+
 2. **公共模块基础类**
    - `Result<T>`：统一响应封装
    - `ResponseCode`：响应码枚举（含订单、发运、合作方等模块码段）
@@ -168,3 +168,135 @@
 | `src/views/NotFoundView.vue` | 404 页面 |
 | `vite.config.ts` | Vite 配置，代理配置（后端 context-path=/api） |
 | `package.json` | 依赖配置，sass 在 devDependencies |
+
+---
+
+### plan_55 用户模块数据库建表（已完成）
+
+**完成内容**：
+
+1. **Maven 依赖配置**
+   - 父 POM 添加 `flyway.version: 9.22.3` 和依赖管理
+   - API 模块添加 `flyway-core`, `flyway-mysql`, `druid-spring-boot-3-starter`
+
+2. **数据源与迁移配置**
+   - `application.yml`：数据源配置（Druid 连接池）
+   - Flyway 配置：baseline-on-migrate, locations, encoding
+
+3. **Flyway 迁移脚本**（3 个）
+   - `V1__create_user_table.sql`：用户表（23 字段）
+   - `V2__create_role_table.sql`：角色表（11 字段）+ 5 条预定义角色
+   - `V3__create_user_role_table.sql`：用户角色关联表（8 字段）
+
+4. **实体类更新**
+   - `User.java`：Boolean 类型，删除 departmentName 字段
+   - `Role.java`：Boolean 类型
+   - `UserRole.java`：Boolean 类型，删除 username/roleCode 冗余字段，添加权限计算注释
+
+5. **验证通过**
+   - Flyway 迁移成功：3 个脚本执行完成
+   - 数据库表创建：t_user, t_role, t_user_role, flyway_schema_history
+   - 初始数据：5 条预定义角色（SYSTEM_ADMIN, DATA_ADMIN, CUSTOMER_MANAGER, PURCHASE_SPECIALIST, OPERATION_SPECIALIST）
+
+**技术决策**：
+
+| 决策 | 选择 | 理由 |
+|------|------|------|
+| 数据库迁移 | Flyway | 版本化管理，可追溯，团队协作友好 |
+| 数据源 | Druid | 监控能力强，国产化支持 |
+| 布尔字段 | Boolean（Java） + TINYINT（DB） | 类型语义清晰，MyBatis-Plus 自动映射 |
+| 可空字段 | NULL 替代 -1 特殊值 | NULL 的语义就是"无"，SQL 为此设计 |
+| 软删除 | 删除时 username 加后缀 | 释放 username 供新用户使用，同时保留审计数据 |
+| 冗余字段 | 删除 | 数据一致性 > 性能，JOIN 问题以后再说 |
+| 权限计算 | MIN(data_scope_type) | 取最宽松权限，避免 is_primary 特殊逻辑 |
+
+**深度审查反馈（9 个问题修复）**：
+
+| 优先级 | 问题 | 修复方案 |
+|--------|------|----------|
+| 🔴 P0 | 软删除与唯一约束冲突 | 删除时 username 加后缀（admin_deleted_1705334400） |
+| 🔴 P0 | Integer vs Boolean 类型 | 统一改为 Boolean |
+| 🟡 P1 | 冗余字段同步问题 | 删除 username, role_code, department_name |
+| 🟡 P1 | -1 特殊值 | 改为 NULL |
+| 🟡 P1 | is_primary 设计 | 保留字段但重新定义为"仅展示"，权限取 MIN 值 |
+| 🟢 P2 | JDBC URL 编码错误 | 改用 connectionCollation 参数 |
+| 🟢 P2 | 缺少 Druid 依赖 | 添加到 pom.xml |
+
+**软删除策略**：
+
+```sql
+-- 软删除时必须修改 username，释放唯一约束
+UPDATE t_user
+SET username = CONCAT(username, '_deleted_', UNIX_TIMESTAMP()),
+    is_deleted = 1
+WHERE id = ?;
+```
+
+**权限计算逻辑**：
+
+```java
+// 用户数据权限取所有角色中的"最宽松"权限
+// data_scope_type: 1=全部 > 2=部门 > 3=本人
+dataScope = MIN(userRoles.stream()
+    .map(UserRole::getDataScopeType)
+    .collect(Collectors.toList()));
+```
+
+**预定义角色数据**：
+
+| role_code | role_name | data_scope_type | 说明 |
+|-----------|-----------|-----------------|------|
+| SYSTEM_ADMIN | 系统管理员 | 1 (全部) | 负责权限配置、数据维护与系统管理 |
+| DATA_ADMIN | 数据管理员 | 1 (全部) | 仅负责数据查看、导出等数据管理操作 |
+| CUSTOMER_MANAGER | 客户经理 | 3 (本人) | 负责客户来单收集、订单创建与跟进 |
+| PURCHASE_SPECIALIST | 采购专员 | 3 (本人) | 负责供应商选择、资质审核与合作确认 |
+| OPERATION_SPECIALIST | 运营专员 | 3 (本人) | 负责发运计划制定、物流安排与在途跟踪 |
+
+**修改文件清单**：
+
+```
+order-platform-backend/
+├── pom.xml                                  # 添加 flyway.version + 依赖管理
+├── order-platform-api/
+│   ├── pom.xml                              # 添加 Druid + Flyway 依赖
+│   └── src/main/resources/
+│       ├── application.yml                  # 数据源 + Flyway 配置
+│       └── db/migration/
+│           ├── V1__create_user_table.sql    # 用户表 DDL（Boolean 注释）
+│           ├── V2__create_role_table.sql    # 角色表 DDL + 初始数据
+│           └── V3__create_user_role_table.sql # 用户角色关联表 DDL（权限计算注释）
+└── order-platform-user/src/main/java/.../entity/
+    ├── User.java                             # Boolean + 删除 departmentName
+    ├── Role.java                             # Boolean 类型
+    └── UserRole.java                         # Boolean + 删除冗余字段 + 权限计算注释
+```
+
+**表结构验证**：
+
+```
+t_user: 23 字段
+- username (UNI), password, user_code
+- real_name, email, phone, avatar
+- is_enabled, is_locked, locked_time, locked_reason
+- last_login_time, last_login_ip, login_count
+- password_changed_time, password_expire_time
+- department_id (NULL), position, employee_no, remark
+- created_at, created_by (NULL), updated_at, updated_by (NULL), is_deleted
+
+t_role: 11 字段
+- role_code (UNI), role_name, role_type, data_scope_type
+- description, sort_order
+- is_enabled, is_system
+- created_at, created_by (NULL), updated_at, updated_by (NULL), is_deleted
+
+t_user_role: 8 字段
+- user_id, role_id, is_primary
+- created_at, created_by (NULL), updated_at, updated_by (NULL), is_deleted
+- UNIQUE(user_id, role_id)
+```
+
+**待完成**：
+- [ ] plan_55 阶段2 - Service 层和 Controller 层（管理员创建用户 API）
+- [ ] plan_56 - API 启动模块配置（Knife4j 文档）
+
+---

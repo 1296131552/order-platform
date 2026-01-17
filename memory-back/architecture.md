@@ -109,6 +109,89 @@ com.company.order.visual
 |------|------|----------|
 | `Partner.java` | 合作方统一表 | `PartnerType` 区分供应商/承运商/客户 |
 
+### 用户聚合 (order-platform-user)
+
+| 文件 | 职责 | 关键设计 |
+|------|------|----------|
+| `User.java` | 用户实体 | Boolean 类型，软删除设计 |
+| `Role.java` | 角色实体 | 预定义 5 个系统角色 |
+| `UserRole.java` | 用户角色关联 | 权限计算取 MIN(data_scope_type) |
+
+---
+
+## 数据库设计
+
+### 迁移策略
+
+使用 **Flyway** 进行版本化数据库迁移：
+
+```
+order-platform-api/
+└── src/main/resources/
+    └── db/migration/
+        ├── V1__create_user_table.sql      # 用户表
+        ├── V2__create_role_table.sql      # 角色表 + 初始数据
+        └── V3__create_user_role_table.sql # 用户角色关联表
+```
+
+**命名规则**：
+- `V{版本}__{描述}.sql`
+- 版本号递增，描述用下划线分隔
+- Flyway 按版本顺序执行，记录在 `flyway_schema_history` 表
+
+### 表结构
+
+#### t_user（用户表）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | BIGINT | 主键，自增 |
+| username | VARCHAR(50) | 用户名，唯一索引 |
+| password | VARCHAR(255) | 密码（BCrypt 加密） |
+| is_enabled | TINYINT | 是否启用（Boolean 映射） |
+| is_locked | TINYINT | 是否锁定（Boolean 映射） |
+| department_id | BIGINT | 部门 ID（NULL 表示未分配） |
+| created_by | BIGINT | 创建人 ID（NULL 表示系统创建） |
+| is_deleted | TINYINT | 是否删除（Boolean 映射） |
+
+**设计要点**：
+- 布尔字段存储为 `TINYINT`，Java 映射为 `Boolean`
+- 可空字段用 `NULL` 而非 `-1` 特殊值
+- 软删除时修改 username 加后缀释放唯一约束
+
+#### t_role（角色表）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | BIGINT | 主键，自增 |
+| role_code | VARCHAR(50) | 角色代码，唯一索引 |
+| role_name | VARCHAR(50) | 角色名称 |
+| data_scope_type | TINYINT | 数据权限：1-全部，2-部门，3-本人 |
+| is_system | TINYINT | 是否系统角色（Boolean 映射） |
+
+**预定义角色**：
+
+| role_code | role_name | data_scope_type |
+|-----------|-----------|-----------------|
+| SYSTEM_ADMIN | 系统管理员 | 1 (全部) |
+| DATA_ADMIN | 数据管理员 | 1 (全部) |
+| CUSTOMER_MANAGER | 客户经理 | 3 (本人) |
+| PURCHASE_SPECIALIST | 采购专员 | 3 (本人) |
+| OPERATION_SPECIALIST | 运营专员 | 3 (本人) |
+
+#### t_user_role（用户角色关联表）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | BIGINT | 主键，自增 |
+| user_id | BIGINT | 用户 ID |
+| role_id | BIGINT | 角色 ID |
+| is_primary | TINYINT | 是否主角色（Boolean 映射，仅展示用） |
+
+**唯一约束**：`UNIQUE(user_id, role_id)`
+
+**权限计算**：取所有角色中权限最宽松的（`data_scope_type` 最小值）
+
 ---
 
 ## 枚举存储策略（重要）
@@ -279,3 +362,138 @@ CREATED → PICKED_UP → IN_TRANSIT → DELIVERED → RECEIVED
    后端：context-path=/api，Controller=@RequestMapping("/xxx")
    完整路径：http://localhost:8080/api/xxx
    ```
+
+---
+
+## 后端基础设施配置
+
+### 数据源配置（Druid）
+
+```yaml
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/order_platform?serverTimezone=Asia/Shanghai&connectionCollation=utf8mb4_unicode_ci
+    username: root
+    password: ${DB_PASSWORD:root}
+    type: com.alibaba.druid.pool.DruidDataSource
+    druid:
+      initial-size: 5
+      min-idle: 5
+      max-active: 20
+```
+
+**选择理由**：
+- 监控能力强（内置监控页面）
+- 国产化支持良好
+- 连接池性能稳定
+
+### Flyway 配置
+
+```yaml
+spring:
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
+    encoding: UTF-8
+    validate-on-migrate: true
+```
+
+**选择理由**：
+- 版本化管理，可追溯
+- 团队协作友好，自动执行
+- 失败即回滚，保证一致性
+
+### MyBatis-Plus 配置
+
+```yaml
+mybatis-plus:
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: isDeleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+```
+
+**布尔字段映射**：
+- 数据库：`TINYINT` (0/1)
+- Java：`Boolean` (true/false)
+- MyBatis-Plus 自动处理转换
+
+---
+
+## 架构设计原则
+
+### 1. 类型一致性
+
+**布尔语义统一用 Boolean**：
+```java
+// ✅ 正确
+private Boolean isEnabled;
+private Boolean isLocked;
+private Boolean isDeleted;
+
+// ❌ 错误
+private Integer isEnabled;  // 布尔语义不该用 Integer
+```
+
+### 2. 可空语义用 NULL
+
+**"无"的语义用 NULL，不用特殊值**：
+```sql
+-- ✅ 正确
+department_id BIGINT NULL DEFAULT NULL
+created_by BIGINT NULL DEFAULT NULL
+
+-- ❌ 错误
+department_id BIGINT NOT NULL DEFAULT -1  -- -1 是 magic number
+```
+
+### 3. 软删除策略
+
+**删除时修改唯一键字段**：
+```sql
+-- 软删除时必须修改 username，释放唯一约束
+UPDATE t_user
+SET username = CONCAT(username, '_deleted_', UNIX_TIMESTAMP()),
+    is_deleted = 1
+WHERE id = ?;
+```
+
+### 4. 权限计算简化
+
+**避免特殊情况分支**：
+```java
+// ✅ 好品味：统一计算
+dataScope = userRoles.stream()
+    .map(UserRole::getDataScopeType)
+    .min(Integer::compareTo)
+    .orElse(3);
+
+// ❌ 坏品味：特殊情况
+if (user.getPrimaryRole() != null) {
+    dataScope = user.getPrimaryRole().getDataScopeType();
+} else {
+    // 复杂逻辑...
+}
+```
+
+### 5. 冗余字段删除
+
+**数据一致性 > 性能**：
+```sql
+-- ✅ 正确：通过 JOIN 获取
+SELECT u.*, r.*
+FROM t_user u
+JOIN t_user_role ur ON u.id = ur.user_id
+JOIN t_role r ON ur.role_id = r.id;
+
+-- ❌ 错误：冗余字段同步问题
+t_user_role (user_id, role_id, username, role_code)
+-- username/role_code 谁负责同步？
+```
+
+---

@@ -48,6 +48,7 @@
         <easyexcel.version>3.3.2</easyexcel.version>
         <spring-statemachine.version>3.2.0</spring-statemachine.version>
         <jwt.version>0.11.5</jwt.version>
+        <flyway.version>9.22.3</flyway.version>
     </properties>
 
     <dependencyManagement>
@@ -156,6 +157,18 @@
                 <groupId>io.jsonwebtoken</groupId>
                 <artifactId>jjwt-jackson</artifactId>
                 <version>${jwt.version}</version>
+            </dependency>
+
+            <!-- Flyway 数据库迁移 -->
+            <dependency>
+                <groupId>org.flywaydb</groupId>
+                <artifactId>flyway-core</artifactId>
+                <version>${flyway.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.flywaydb</groupId>
+                <artifactId>flyway-mysql</artifactId>
+                <version>${flyway.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

@@ -10,9 +10,9 @@ spring:
   # 数据源配置
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/order_platform?useUnicode=true&characterEncoding=utf8mb4&serverTimezone=Asia/Shanghai
+    url: jdbc:mysql://localhost:3306/order_platform?serverTimezone=Asia/Shanghai&connectionCollation=utf8mb4_unicode_ci
     username: root
-    password: ${DB_PASSWORD:}
+    password: w123456789
     type: com.alibaba.druid.pool.DruidDataSource
     druid:
       initial-size: 5
@@ -25,6 +25,15 @@ spring:
       test-while-idle: true
       test-on-borrow: false
       test-on-return: false
+
+  # Flyway 数据库迁移配置
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
+    encoding: UTF-8
+    validate-on-migrate: true
 
   # Redis 配置
   data:
@@ -74,15 +83,65 @@ knife4j:
   enable: true
   setting:
     language: zh_cn
+    # 增强功能 
+    enable-swagger-models: true   # 启用「实体类列表」模块（展示DTO/Entity字段说明）
+    enable-dociment-manage: true  # 启用「文档管理」模块（支持导出Markdown/HTML/PDF）
+    swagger-model-name: 实体类列表 # 显示名称
+    # 调试功能
+    enable-reload-cache-parameter: true
+    # 分组显示
+    enable-version: true
+    # 生产环境
+    production: false  # 8. 生产环境屏蔽开关（false=开发/测试环境不屏蔽，true=生产禁用文档）
 
 springdoc:
   api-docs:
     enabled: true
     path: /v3/api-docs
   swagger-ui:
-    enabled: true
+    enabled: true 
     path: /swagger-ui.html
-
+  #API 基本信息
+  info:
+    title: 订单可视化数字化管理平台 API
+  # 服务器配置
+  server:
+    - url: http://localhost:8080/api
+      description: 本地开发环境
+    - url: http://test.example.com/api
+      description: 测试环境  
+  # 分组配置
+  group-configs:
+    - group: order
+      display-name: 订单管理
+      paths-to-match: /order/**
+    - group: shipment
+      display-name: 发运管理
+      paths-to-match: /shipment/**
+    - group: partner
+      display-name: 合作方管理
+      paths-to-match: /partner/**
+    - group: dashboard
+      display-name: 看板统计
+      paths-to-match: /dashboard/**
+    - group: attachment
+      display-name: 附件管理
+      paths-to-match: /attachment/**
+    - group: exception
+      display-name: 异常处理
+      paths-to-match: /exception/**
+    - group: visualization
+      display-name: 可视化服务
+      paths-to-match: /visualization/**
+    - group: user
+      display-name: 用户权限
+      paths-to-match: /user/**
+  # JWT 认证配置
+  default-consumes-media-type: application/json
+  default-produces-media-type: application/json
+  # 全局参数（如请求头中的 token）
+  default-flat-param-object: true
+  
 # 日志配置
 logging:
   level:
