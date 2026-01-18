@@ -111,10 +111,327 @@ com.company.order.visual
 
 ### 用户聚合 (order-platform-user)
 
+用户模块是系统的基础服务，提供用户认证、授权和管理功能。采用 RBAC 权限模型，
+支持多账号登录、数据权限控制和完整的用户生命周期管理。
+
+#### 目录结构
+
+```
+com.company.order.visual.user/
+├── controller/       # API 控制层
+├── service/          # 业务服务层
+│   └── impl/         # 服务实现
+├── mapper/           # 数据访问层
+├── converter/        # 实体转换层
+├── dto/              # 数据传输对象
+└── entity/           # 实体模型
+```
+
+#### Controller 层
+
+##### UserController.java
+**职责**：用户管理 API 入口，处理 HTTP 请求/响应
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| `login(LoginRequest)` | POST /api/users/login | 用户登录，支持用户名/邮箱/手机号 |
+| `getUserById(Long)` | GET /api/users/{userId} | 根据ID查询用户详细信息 |
+| `pageUsers(UserQueryRequest)` | GET /api/users/list | 分页查询用户，支持多条件筛选 |
+
+**关键设计**：
+- 使用 `@Tag` 和 `@Operation` 提供 Swagger 文档
+- 统一返回 `Result<T>` 格式
+- `@Valid` 触发参数校验
+
+**TODO**：
+- POST /api/users/logout - 退出登录
+- POST /api/users/create - 创建用户
+- PUT /api/users/update - 更新用户
+- DELETE /api/users/delete/{userId} - 删除用户
+
+---
+
+#### Service 层
+
+##### UserService.java
+**职责**：用户服务接口定义，暴露业务能力
+
+**方法签名**：
+```java
+// 用户认证
+LoginResponse login(LoginRequest request);
+
+// 用户查询
+UserVO getUserById(Long userId);
+Page<UserVO> pageUsers(UserQueryRequest request);
+
+// 用户管理（TODO）
+// Long createUser(UserCreateRequest request);
+// void updateUser(UserUpdateRequest request);
+// void deleteUser(Long userId);
+
+// 密码管理（TODO，待权限模块完成）
+// void changePassword(Long userId, String oldPassword, String newPassword);
+// void resetPassword(Long userId, String newPassword);
+```
+
+---
+
+##### UserServiceImpl.java
+**职责**：用户服务实现，核心业务逻辑
+
+**依赖**：
+- `UserMapper` - 用户数据访问
+- `UserRoleMapper` - 角色数据访问
+- `UserConverter` - 实体转换
+- `BCryptPasswordEncoder` - 密码加密
+
+**核心方法**：
+
+| 方法 | 职责 | 关键逻辑 |
+|------|------|----------|
+| `login()` | 用户登录 | 1. 按账号查找用户<br>2. 验证状态（启用/锁定/删除）<br>3. BCrypt 验证密码<br>4. 更新登录信息<br>5. 返回用户信息和 token |
+| `findUserByAccount()` | 按账号查询 | 依次尝试 username/email/phone 字段 |
+| `validateUserForLogin()` | 验证登录状态 | 检查 isEnabled, isLocked, isDeleted<br>检查是否锁定过期 |
+| `updateLoginInfo()` | 更新登录信息 | 更新最后登录时间、IP、登录次数 |
+| `getUserById()` | 获取用户详情 | 查询用户 + 加载角色列表 |
+| `pageUsers()` | 分页查询 | 动态构建查询条件 + 批量加载角色 |
+| `buildQueryWrapper()` | 构建查询条件 | 17 个可选条件的动态组装 |
+| `getUserByIdOrThrow()` | 获取或抛出 | 不存在或已删除时抛出异常 |
+
+**事务管理**：
+- `@Transactional` - 登录操作保证原子性
+
+**查询条件支持**（17 个）：
+- 账号信息：username, userCode, email, phone（模糊）
+- 基本信息：realName, position, employeeNo（模糊）
+- 状态筛选：isEnabled, isLocked
+- 组织权限：departmentId, roleId
+- 时间范围：createdAt[Start/End], lastLoginTime[Start/End]
+
+---
+
+#### Mapper 层
+
+##### UserMapper.java
+**职责**：用户数据访问
+
+```java
+@Mapper
+public interface UserMapper extends BaseMapper<User> {
+}
+```
+
+**功能**：继承 MyBatis-Plus `BaseMapper`，获得基础 CRUD 能力
+
+---
+
+##### RoleMapper.java
+**职责**：角色数据访问
+
+```java
+@Mapper
+public interface RoleMapper extends BaseMapper<Role> {
+}
+```
+
+**功能**：继承 MyBatis-Plus `BaseMapper`，获得基础 CRUD 能力
+
+---
+
+##### UserRoleMapper.java
+**职责**：用户角色关联，批量查询优化
+
+**方法签名**：
+```java
+// 查询单个用户的角色（JOIN 查询）
+List<RoleInfo> selectRolesByUserId(@Param("userId") Long userId);
+
+// 批量查询多个用户的角色（解决 N+1 问题）
+List<UserRoleResult> selectRolesByUserIds(@Param("userIds") List<Long> userIds);
+```
+
+**性能优化**：
+- 单用户查询：使用 JOIN，一次查询完成
+- 批量查询：使用 `IN` + JOIN，100 用户从 101 次查询降至 2 次
+
+**SQL 示例**：
+```sql
+-- 批量查询
+SELECT ur.user_id, r.id, r.role_code, r.role_name,
+       r.data_scope_type, ur.is_primary
+FROM t_user_role ur
+JOIN t_role r ON ur.role_id = r.id
+WHERE ur.user_id IN (1, 2, 3, ...)
+AND ur.is_deleted = false AND r.is_enabled = true
+ORDER BY ur.user_id, ur.is_primary DESC
+```
+
+---
+
+#### Converter 层
+
+##### UserConverter.java
+**职责**：Entity 与 VO 转换，解决重复代码和 N+1 问题
+
+**方法签名**：
+```java
+// 单个转换（自动加载角色）
+UserVO toVO(User user);
+
+// 单个转换（角色预加载）
+UserVO toVO(User user, List<RoleInfo> roles);
+
+// 批量转换（一次查询所有角色）
+List<UserVO> toVO(List<User> users);
+```
+
+**性能优化**：
+- 单个转换：调用 `selectRolesByUserId()`
+- 批量转换：调用 `selectRolesByUserIds()`，然后 Map 分组
+
+**效果对比**：
+| 场景 | 优化前 | 优化后 |
+|------|--------|--------|
+| 100 个用户查询 | 101 次 DB 查询 | 2 次 DB 查询 |
+
+---
+
+#### DTO 层
+
+##### LoginRequest.java
+**职责**：登录请求数据
+
+| 字段 | 类型 | 校验规则 |
+|------|------|----------|
+| account | String | @NotBlank |
+| password | String | @NotBlank |
+
+---
+
+##### LoginResponse.java
+**职责**：登录响应数据
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| user | UserVO | 用户信息（复用 UserVO） |
+| token | String | JWT Token（当前返回 null，TODO） |
+
+---
+
+##### UserVO.java
+**职责**：用户视图对象，返回给前端
+
+**字段列表**：
+- 基础信息：id, username, userCode, realName
+- 联系方式：email, phone
+- 状态控制：isEnabled, isLocked
+- 组织信息：position, employeeNo
+- 登录信息：lastLoginTime, lastLoginIp, loginCount
+- 角色列表：roles（List<RoleInfo>）
+
+**内部类 RoleInfo**：
+```java
+public static class RoleInfo {
+    private Long roleId;
+    private String roleCode;
+    private String roleName;
+    private Integer dataScopeType;  // 1=全部, 2=部门, 3=本人, 4=自定义
+    private Boolean isPrimary;
+}
+```
+
+---
+
+##### UserQueryRequest.java
+**职责**：分页查询请求
+
+**查询条件（17 个）**：
+- 账号信息：username, userCode, email, phone（模糊）
+- 基本信息：realName, position, employeeNo（模糊）
+- 状态筛选：isEnabled, isLocked
+- 组织权限：departmentId, roleId
+- 时间范围：createdAtStart/End, lastLoginTimeStart/End
+- 分页参数：pageNum（默认1）, pageSize（默认10）
+
+---
+
+##### UserCreateRequest.java
+**职责**：创建用户请求
+
+**必填字段**：
+- username: 3-20 位，字母数字下划线
+- password: 6-20 位
+- realName: 最多 20 位
+
+**可选字段**：
+- email: 邮箱格式
+- phone: 手机号格式（1[3-9]\d{9}）
+- roleIds: 角色列表
+- departmentId, position, employeeNo, remark
+
+---
+
+##### UserUpdateRequest.java
+**职责**：更新用户请求
+
+**可更新字段**：
+- realName, email, phone, avatar
+- isEnabled, departmentId
+- position, employeeNo, remark
+- roleIds（角色同步）
+
+---
+
+##### UserRoleResult.java
+**职责**：批量查询角色结果
+
+**字段列表**：
+- userId（用于分组）
+- roleId, roleCode, roleName
+- dataScopeType, isPrimary
+
+**方法**：
+- `toRoleInfo()` - 转换为 RoleInfo（去除 userId）
+
+---
+
+#### 架构设计要点
+
+1. **多账号登录**
+   - 统一 `account` 字段接收
+   - 依次尝试 username/email/phone 匹配
+   - 前端无需区分账号类型
+
+2. **性能优化**
+   - 批量角色查询消除 N+1 问题
+   - Converter 层统一转换逻辑
+   - 动态查询条件构建
+
+3. **安全设计**
+   - BCrypt 密码加密（单向哈希）
+   - 账号锁定机制（isLocked + lockedTime）
+   - 软删除保护（isDeleted）
+
+4. **扩展性**
+   - 预留 JWT token 字段
+   - 预留密码管理接口
+   - 角色权限计算取 MIN 值（最宽松）
+
+5. **TODO 事项**
+   - JWT Token 生成与验证（P0）
+   - 认证拦截器（P0）
+   - 退出登录（P0）
+   - 用户 CRUD（P1）
+
+---
+
+#### Entity 层
+
 | 文件 | 职责 | 关键设计 |
 |------|------|----------|
-| `User.java` | 用户实体 | Boolean 类型，软删除设计 |
-| `Role.java` | 角色实体 | 预定义 5 个系统角色 |
+| `User.java` | 用户实体 | Boolean 类型，软删除设计，23 字段 |
+| `Role.java` | 角色实体 | 预定义 5 个系统角色，4 级数据权限 |
 | `UserRole.java` | 用户角色关联 | 权限计算取 MIN(data_scope_type) |
 
 ---

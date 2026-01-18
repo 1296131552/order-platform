@@ -296,7 +296,122 @@ t_user_role: 8 字段
 ```
 
 **待完成**：
-- [ ] plan_55 阶段2 - Service 层和 Controller 层（管理员创建用户 API）
+- [x] plan_22 - 用户管理（登录/查询接口）
+- [ ] plan_04 - JWT 认证功能（P0）
+- [ ] plan_22 - 用户 CRUD 接口（P1）
+- [ ] plan_56 - API 启动模块配置（Knife4j 文档）
+
+---
+
+## 2026-01-18
+
+### plan_22：用户管理 - 登录与查询（部分完成）
+
+#### 完成内容
+
+**Controller 层**：
+- `UserController.java`：用户管理 API 入口
+  - POST /api/user/login - 用户登录（支持用户名/邮箱/手机号）
+  - GET /api/user/{userId} - 获取用户详情
+  - GET /api/user/list - 分页查询用户（17 个查询条件）
+
+**Service 层**：
+- `UserService.java`：用户服务接口
+  - login() - 用户登录
+  - getUserById() - 根据 ID 获取用户
+  - pageUsers() - 分页查询用户
+  - TODO: createUser(), updateUser(), deleteUser()
+
+- `UserServiceImpl.java`：用户服务实现
+  - findUserByAccount() - 按账号查询（支持三种账号类型）
+  - validateUserForLogin() - 验证用户状态和密码
+  - updateLoginInfo() - 更新登录信息
+  - buildQueryWrapper() - 构建动态查询条件
+  - getUserByIdOrThrow() - 获取用户或抛出异常
+
+**Mapper 层**：
+- `UserMapper.java`：继承 BaseMapper<User>
+- `RoleMapper.java`：继承 BaseMapper<Role>
+- `UserRoleMapper.java`：用户角色关联
+  - selectRolesByUserId() - 查询单个用户角色（JOIN 查询）
+  - selectRolesByUserIds() - 批量查询用户角色（解决 N+1 问题）
+
+**Converter 层**：
+- `UserConverter.java`：实体转换器
+  - toVO(User) - 单个转换，自动加载角色
+  - toVO(User, List<RoleInfo>) - 单个转换，角色预加载
+  - toVO(List<User>) - 批量转换，一次查询所有角色
+
+**DTO 层**（7 个）：
+- `LoginRequest.java`：登录请求（account + password）
+- `LoginResponse.java`：登录响应（user + token TODO）
+- `UserVO.java`：用户视图对象（包含角色列表）
+- `UserQueryRequest.java`：分页查询请求（17 个查询条件）
+- `UserCreateRequest.java`：创建用户请求（含完整校验）
+- `UserUpdateRequest.java`：更新用户请求（含完整校验）
+- `UserRoleResult.java`：批量查询角色结果
+
+#### 技术决策
+
+| 决策 | 选择 | 理由 |
+|------|------|------|
+| 多账号登录 | 统一 account 字段 | 用户名/邮箱/手机号共用登录入口 |
+| 密码加密 | BCrypt | 单向哈希，自带盐值，抗彩虹表 |
+| 批量查询 | selectRolesByUserIds | 100 用户从 101 次查询降至 2 次 |
+| 转换器 | UserConverter | 消除 Entity→VO 重复代码 |
+
+#### 功能完成情况
+
+| 功能 | 状态 | 说明 |
+|------|------|------|
+| 用户登录 | ✅ 已完成 | 支持三种账号类型，BCrypt 验证 |
+| 用户查询 | ✅ 已完成 | ID 查询 + 分页查询（17 条件） |
+| 角色查询 | ✅ 已完成 | JOIN 查询，解决 N+1 问题 |
+| JWT 认证 | ❌ 待实现 | P0 优先级 |
+| 认证拦截器 | ❌ 待实现 | P0 优先级 |
+| 退出登录 | ❌ 待实现 | 依赖 JWT |
+| 创建用户 | ❌ 待实现 | P1 优先级 |
+| 更新用户 | ❌ 待实现 | P1 优先级 |
+| 删除用户 | ❌ 待实现 | P1 优先级 |
+
+#### 代码审查反馈
+
+| 优先级 | 问题 | 修复方案 |
+|--------|------|----------|
+| 🟢 P2 | N+1 查询问题 | 新增 selectRolesByUserIds() 批量查询 |
+| 🟢 P2 | 重复转换代码 | 新增 UserConverter 统一转换逻辑 |
+| 🟢 P2 | login 方法过长 | 拆分为 3 个私有方法 |
+| 🟢 P2 | isDeleted NPE 风险 | 添加 null 检查 |
+
+#### 修改文件清单
+
+```
+order-platform-backend/order-platform-user/src/main/java/.../user/
+├── controller/
+│   └── UserController.java              # 新增，3 个 API 接口
+├── service/
+│   ├── UserService.java                 # 新增，服务接口
+│   └── impl/
+│       └── UserServiceImpl.java         # 新增，服务实现
+├── mapper/
+│   ├── UserMapper.java                  # 新增，基础 CRUD
+│   ├── RoleMapper.java                  # 新增，基础 CRUD
+│   └── UserRoleMapper.java              # 新增，批量角色查询
+├── converter/
+│   └── UserConverter.java               # 新增，实体转换器
+└── dto/
+    ├── LoginRequest.java                # 新增
+    ├── LoginResponse.java               # 新增
+    ├── UserVO.java                      # 新增
+    ├── UserQueryRequest.java            # 新增
+    ├── UserCreateRequest.java           # 新增
+    ├── UserUpdateRequest.java           # 新增
+    └── UserRoleResult.java              # 新增
+```
+
+#### 待完成
+- [ ] plan_04 - JWT 认证功能（P0）
+- [ ] plan_22 - 用户 CRUD 接口（P1）
 - [ ] plan_56 - API 启动模块配置（Knife4j 文档）
 
 ---
