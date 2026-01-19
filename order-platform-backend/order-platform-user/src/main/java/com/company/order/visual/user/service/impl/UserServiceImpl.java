@@ -4,6 +4,10 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.company.order.visual.common.exception.BusinessException;
 import com.company.order.visual.common.response.ResponseCode;
+import com.company.order.visual.common.security.JwtService;
+import com.company.order.visual.common.security.RedisKeyConstants;
+import com.company.order.visual.common.security.TokenBlacklistService;
+import com.company.order.visual.common.security.TokenInfo;
 import com.company.order.visual.user.converter.UserConverter;
 import com.company.order.visual.user.dto.*;
 import com.company.order.visual.user.entity.User;
@@ -11,9 +15,11 @@ import com.company.order.visual.user.mapper.UserMapper;
 import com.company.order.visual.user.mapper.UserRoleMapper;
 import com.company.order.visual.user.service.UserService;
 import jakarta.annotation.Resource;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
@@ -30,6 +36,7 @@ import java.util.List;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
 
     @Resource
@@ -41,16 +48,44 @@ public class UserServiceImpl implements UserService {
     @Resource
     private UserConverter userConverter;
 
-    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    private final PasswordEncoder passwordEncoder;
+    private final JwtService jwtService;
+    private final TokenBlacklistService tokenBlacklistService;
 
-    // ==================== 登录 ====================
+    // ==================== 登录/登出 ====================
+
+    /**
+     * 用户登出
+     * <p>
+     * 流程：解析Token → 加入黑名单 → 移除活跃Token记录
+     */
+    public void logout(String token) {
+        if (token == null || token.isEmpty()) {
+            return;
+        }
+
+        TokenInfo tokenInfo = jwtService.parseToken(token);
+        if (!tokenInfo.isValid()) {
+            log.debug("登出时Token无效，无需处理");
+            return;
+        }
+
+        // 加入黑名单
+        tokenBlacklistService.addToBlacklist(tokenInfo);
+
+        // 移除活跃Token记录
+        tokenBlacklistService.removeActiveToken(tokenInfo.getUserId(), tokenInfo.getTokenId());
+
+        log.info("用户登出成功, userId={}, tokenId={}", tokenInfo.getUserId(), tokenInfo.getTokenId());
+    }
 
     /**
      * 用户登录
      * <p>
-     * 流程：查询用户 → 验证状态与密码 → 更新登录信息 → 返回用户信息
+     * 流程：验证用户 → 生成Token → 异步更新登录信息 → 返回
+     * <p>
+     * 修复说明：移除事务注解，Token生成不依赖数据库操作，避免幽灵Token问题
      */
-    @Transactional(rollbackFor = Exception.class)
     public LoginResponse login(LoginRequest request) {
         // 1. 查询用户（支持用户名/邮箱/手机号登录）
         User user = findUserByAccount(request.getAccount());
@@ -58,15 +93,31 @@ public class UserServiceImpl implements UserService {
         // 2. 验证用户状态和密码
         validateUserForLogin(user, request.getPassword());
 
-        // 3. 更新登录信息
-        updateLoginInfo(user);
+        // 3. 获取或初始化 Token 版本号
+        Long tokenVersion = tokenBlacklistService.getUserTokenVersion(user.getId());
+        if (tokenVersion == null) {
+            tokenVersion = RedisKeyConstants.INITIAL_TOKEN_VERSION;
+            tokenBlacklistService.setUserTokenVersion(user.getId(), tokenVersion);
+        } else {
+            // 刷新版本号过期时间，防止活跃用户的版本号键过期导致旧Token复活
+            tokenBlacklistService.refreshUserTokenVersion(user.getId());
+        }
 
-        // 4. 构建响应（使用转换器，消除重复代码）
+        // 4. 生成 Token（不加事务，在数据库操作之前）
+        TokenInfo tokenInfo = jwtService.generateToken(user.getId(), tokenVersion);
+
+        // 5. 记录活跃 Token（用于追踪）
+        tokenBlacklistService.addActiveToken(user.getId(), tokenInfo.getTokenId());
+
+        // 6. 异步更新登录信息（不阻塞返回，采用最终一致性）
+        updateLoginInfoAsync(user.getId());
+
+        // 7. 构建响应
         UserVO userVO = userConverter.toVO(user);
 
         return LoginResponse.builder()
                 .user(userVO)
-                .token(null)  // TODO: 集成 JWT 后生成 token
+                .token(tokenInfo.getRawToken())
                 .build();
     }
 
@@ -105,12 +156,26 @@ public class UserServiceImpl implements UserService {
     }
 
     /**
-     * 更新用户登录信息
+     * 异步更新用户登录信息
+     * <p>
+     * 采用最终一致性，不阻塞登录返回
+     * 使用@Transactional确保数据一致性
      */
-    private void updateLoginInfo(User user) {
-        user.setLastLoginTime(LocalDateTime.now());
-        user.setLoginCount(user.getLoginCount() + 1);
-        userMapper.updateById(user);
+    @Async
+    @Transactional(rollbackFor = Exception.class)
+    public void updateLoginInfoAsync(Long userId) {
+        try {
+            User user = userMapper.selectById(userId);
+            if (user != null) {
+                user.setLastLoginTime(LocalDateTime.now());
+                user.setLoginCount(user.getLoginCount() + 1);
+                userMapper.updateById(user);
+                log.debug("异步更新登录信息成功, userId={}", userId);
+            }
+        } catch (Exception e) {
+            log.error("异步更新登录信息失败, userId={}", userId, e);
+            // 不抛出异常，避免影响主流程
+        }
     }
 
     // ==================== 创建用户 ====================

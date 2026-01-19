@@ -20,48 +20,67 @@
 
 ## 二、架构全景图
 
-```
-+-----------------------------------------------------------------------------+
-|                            表现层 (Presentation)                            |
-|  +----------------------+  +-------------------------------------------+   |
-|  |  order-web (Vue3)     |  | order-screen (地图可视化+ECharts+DataV)   |   |
-|  |  Element Plus         |  | 高德地图 + 自研大屏                        |   |
-|  +----------------------+  +-------------------------------------------+   |
-+----------------------------------------+------------------------------------+
-                                        | RESTful API
-+----------------------------------------|------------------------------------+
-|       接入层 (Gateway)                 v                                     |
-|  Nginx (静态资源 + 反向代理 + 负载均衡 + SSL终止)                           |
-+----------------------------------------|------------------------------------+
-                                        v
-+-----------------------------------------------------------------------------+
-|                          应用层 (Application)                               |
-|  +---------------------------------------------------------------------+    |
-|  |              order-platform-api (Spring Boot 3.2.x)                  |    |
-|  |  +------------+  +------------+  +------------+  +------------+      |    |
-|  |  |  订单聚合   |  |  发运聚合   |  | 合作方聚合  |  |  看板聚合   |      |    |
-|  |  |  (Order)    |  | (Shipment)  |  | (Partner)  |  | (Dashboard)|      |    |
-|  |  +------------+  +------------+  +------------+  +------------+      |    |
-|  |                                                                     |    |
-|  |  +------------+  +------------+  +------------+  +------------+      |    |
-|  |  |  附件聚合   |  |  异常聚合   |  |  用户聚合   |  | 可视化聚合 |      |    |
-|  |  |(Attachment) |  | (Exception)|  |  (User)    |  |(Visualization)|     |    |
-|  |  +------------+  +------------+  +------------+  +------------+      |    |
-|  +---------------------------------------------------------------------+    |
-|                                   |                                       |
-|  +--------------------------------|-----------------------------------+   |
-|  |         order-platform-common  v                                   |   |
-|  |   状态机引擎 | 事件总线 | 领域事件 | 统一响应 | 权限认证 | 工具类      |   |
-|  +---------------------------------------------------------------------+   |
-+----------------------------------------|------------------------------------+
-                                        v
-+-----------------------------------------------------------------------------+
-|                        基础设施层 (Infrastructure)                          |
-|  +------------+  +------------+  +------------+  +------------+              |
-|  |  MySQL 8.0  |  |   Redis    |  |  MinIO/OSS |  |  ES 8.11+  |              |
-|  |  业务数据   |  |  缓存+会话 |  |  文件存储  |  |  全文检索  |              |
-|  +------------+  +------------+  +------------+  +------------+              |
-+-----------------------------------------------------------------------------+
+```mermaid
+flowchart TB
+    subgraph PRESENTATION["表现层 (Presentation)"]
+        WEB["order-web (Vue3)<br>Element Plus"]
+        SCREEN["order-screen<br>地图可视化+ECharts+DataV<br>高德地图+自研大屏"]
+    end
+
+    subgraph GATEWAY["接入层 (Gateway)"]
+        NGINX["Nginx<br>静态资源+反向代理<br>负载均衡+SSL终止"]
+    end
+
+    subgraph APPLICATION["应用层 (Application)"]
+        API["order-platform-api<br>(Spring Boot 3.2.x)"]
+
+        subgraph AGGREGATES1["核心聚合"]
+            ORDER["订单聚合<br>(Order)"]
+            SHIPMENT["发运聚合<br>(Shipment)"]
+            PARTNER["合作方聚合<br>(Partner)"]
+            DASHBOARD["看板聚合<br>(Dashboard)"]
+        end
+
+        subgraph AGGREGATES2["支撑聚合"]
+            ATTACHMENT["附件聚合<br>(Attachment)"]
+            EXCEPTION["异常聚合<br>(Exception)"]
+            USER["用户聚合<br>(User)"]
+            VISUALIZATION["可视化聚合<br>(Visualization)"]
+        end
+
+        subgraph COMMON["order-platform-common"]
+            COMMON_ITEMS["状态机引擎 | 事件总线<br>领域事件 | 统一响应<br>权限认证 | 工具类"]
+        end
+    end
+
+    subgraph INFRASTRUCTURE["基础设施层 (Infrastructure)"]
+        MYSQL["MySQL 8.0<br>业务数据"]
+        REDIS["Redis<br>缓存+会话"]
+        MINIO["MinIO/OSS<br>文件存储"]
+        ES["ES 8.11+<br>全文检索"]
+    end
+
+    WEB -->|"RESTful API"| NGINX
+    SCREEN -->|"RESTful API"| NGINX
+    NGINX --> API
+    API --> AGGREGATES1
+    API --> AGGREGATES2
+    AGGREGATES1 --> COMMON
+    AGGREGATES2 --> COMMON
+    COMMON --> MYSQL
+    COMMON --> REDIS
+    COMMON --> MINIO
+    COMMON --> ES
+
+    classDef appLayer fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef aggLayer fill:#fff3e0,stroke:#e65100,stroke-width:1px
+    classDef commonLayer fill:#f3e5f5,stroke:#4a148c,stroke-width:1px
+    classDef infraLayer fill:#e8f5e9,stroke:#1b5e20,stroke-width:1px
+
+    class WEB,SCREEN,NGINX appLayer
+    class ORDER,SHIPMENT,PARTNER,DASHBOARD,ATTACHMENT,EXCEPTION,USER,VISUALIZATION aggLayer
+    class COMMON_ITEMS commonLayer
+    class MYSQL,REDIS,MINIO,ES infraLayer
 ```
 
 ---
@@ -84,33 +103,46 @@
 
 ### 决策2：状态机驱动（Good Taste）
 
+```mermaid
+stateDiagram-v2
+    [*] --> DRAFT
+
+    DRAFT --> EXECUTING: 确认订单<br/>CONFIRM
+    EXECUTING --> PARTIALLY_RECEIVED: 签收<br/>RECEIVE
+    PARTIALLY_RECEIVED --> COMPLETED: 完成<br/>COMPLETE
+    COMPLETED --> ARCHIVED: 归档<br/>ARCHIVE
+
+    DRAFT --> ARCHIVED: 取消/关闭
+
+    note right of EXECUTING
+        执行中
+    end note
+
+    note right of PARTIALLY_RECEIVED
+        部分到货
+    end note
+
+    note right of ARCHIVED
+        已归档
+    end note
+
+    state EXCEPTION {
+        [*] --> 异常标记
+    }
+
+    EXECUTING --> EXCEPTION
+    PARTIALLY_RECEIVED --> EXCEPTION
+    COMPLETED --> EXCEPTION
+
+    note right of EXCEPTION
+        异常状态可附加于<br/>任意状态，不参与流转
+    end note
 ```
-+-------------------------------------------------------------------------+
-|                         订单状态机                                      |
-+-------------------------------------------------------------------------+
-|                                                                         |
-|   +---------+     +---------+     +---------+     +---------+           |
-|   |  DRAFT  | --> |EXECUTING| --> | PARTIAL | --> |COMPLETED|           |
-|   | (草稿)  |     | (执行中) |     |_RECEIVED|     | (完成)  |           |
-|   +---------+     +---------+     +---------+     +---------+           |
-|       |                |                |                |               |
-|       |                v                |                |               |
-|       |           +---------+          |                |               |
-|       +---------->|ARCHIVED |          |                |               |
-|    (取消/关闭)    | (已归档)|          |                |               |
-|                   +---------+          |                |               |
-|                                        v                v               |
-|                               +-------------------------+               |
-|                               |   EXCEPTION (异常)       |               |
-|                               |   (可附加于任意状态)      |               |
-|                               +-------------------------+               |
-|                                                                         |
-|   状态流转规则（存储于 t_status_transition_rule）                       |
-|   - 前置条件验证（如：必须存在供应商才能从草稿->执行中）                 |
-|   - 状态变更必须记录事件日志                                            |
-|   - 异常状态不参与状态流转，而是附加标记                                 |
-+-------------------------------------------------------------------------+
-```
+
+**状态流转规则**（存储于 `t_status_transition_rule`）：
+- 前置条件验证（如：必须存在供应商才能从草稿→执行中）
+- 状态变更必须记录事件日志
+- 异常状态不参与状态流转，而是附加标记
 
 **实现方式**：**Spring StateMachine**
 
@@ -375,35 +407,54 @@ public class EventService {
 
 ### 决策4：模块依赖规则（防止循环依赖）
 
-```
-                     +-----------------+
-                     |   API Module    |
-                     +--------+--------+
-                               |
-                     +--------+--------+
-                     |  Common Module  |
-                     | (状态机/事件/工具)|
-                     +--------+--------+
-                               |
-            所有业务模块依赖，但互不依赖
-        +----------+-----------+-----------+
-        |                      |           |
-   +----+----+           +----+----+   +----+----+
-   |  Order  |           | Shipment |   | Partner |
-   +----+----+           +----+----+   +----+----+
-        |                      |             |
-        +----------+-----------+-----------+
-                   |
-          可通过Service接口调用
-              +-----+-----+
-              |           |
-      +-------+-------+   |
-      | Visualization  |   |
-      |   Dashboard    |   |
-      |   Attachment   |   |
-      |   Exception    |   |
-      |   User        |   |
-      +---------------+   |
+```mermaid
+flowchart TB
+    API["API Module<br/>order-platform-api"]
+
+    subgraph COMMON["Common Module"]
+        CM["状态机/事件/工具"]
+    end
+
+    subgraph CORE_AGG["核心聚合 (互不依赖)"]
+        ORDER["Order"]
+        SHIPMENT["Shipment"]
+        PARTNER["Partner"]
+    end
+
+    subgraph SUPPORT_AGG["支撑聚合"]
+        VISUALIZATION["Visualization"]
+        DASHBOARD["Dashboard"]
+        ATTACHMENT["Attachment"]
+        EXCEPTION["Exception"]
+        USER["User"]
+    end
+
+    API --> COMMON
+    ORDER --> COMMON
+    SHIPMENT --> COMMON
+    PARTNER --> COMMON
+    VISUALIZATION --> COMMON
+    DASHBOARD --> COMMON
+    ATTACHMENT --> COMMON
+    EXCEPTION --> COMMON
+    USER --> COMMON
+
+    VISUALIZATION -.->|接口调用| ORDER
+    DASHBOARD -.->|接口调用| ORDER
+    VISUALIZATION -.->|接口调用| SHIPMENT
+    DASHBOARD -.->|接口调用| SHIPMENT
+    VISUALIZATION -.->|接口调用| PARTNER
+    DASHBOARD -.->|接口调用| PARTNER
+
+    classDef apiMod fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef commonMod fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef coreMod fill:#fff3e0,stroke:#e65100,stroke-width:1px
+    classDef supportMod fill:#e8f5e9,stroke:#1b5e20,stroke-width:1px
+
+    class API apiMod
+    class CM commonMod
+    class ORDER,SHIPMENT,PARTNER coreMod
+    class VISUALIZATION,DASHBOARD,ATTACHMENT,EXCEPTION,USER supportMod
 ```
 
 **依赖规则**：
@@ -449,25 +500,33 @@ public class EventService {
 
 **决策**：**自研地图 + BI工具看板**
 
-```
-+-------------------------------------------------------------------------+
-|                        混合大屏架构                                     |
-+-------------------------------------------------------------------------+
-|                                                                         |
-|   +-----------------------+        +-----------------------+             |
-|   |    自研地图可视化      |        |      BI工具看板         |             |
-|   |    Vue3 + 高德地图    | <----> |  DataEase/Superset     |             |
-|   |    - 发货->收货路线   |        |  - KPI指标卡片          |             |
-|   |    - 多线路叠加       |        |  - 趋势图表             |             |
-|   |    - 节点状态标注     |        |  - 排行榜               |             |
-|   |    - 异常高亮         |        |  - 数据钻取             |             |
-|   +-----------------------+        +-----------------------+             |
-|            |                                   |                        |
-|            +------------------+----------------+                        |
-|                               v                                         |
-|                 统一筛选条件（订单/客户/时间范围）                       |
-|                                                                         |
-+-------------------------------------------------------------------------+
+```mermaid
+flowchart TB
+    subgraph SCREEN["混合大屏架构"]
+        subgraph MAP["自研地图可视化"]
+            MAP_VUE["Vue3 + 高德地图"]
+            MAP_FEATURES["发货→收货路线<br/>多线路叠加<br/>节点状态标注<br/>异常高亮"]
+        end
+
+        subgraph BI["BI工具看板"]
+            BI_TOOL["DataEase / Superset"]
+            BI_FEATURES["KPI指标卡片<br/>趋势图表<br/>排行榜<br/>数据钻取"]
+        end
+
+        FILTER["统一筛选条件<br/>订单/客户/时间范围"]
+    end
+
+    MAP_VUE <--> BI_TOOL
+    MAP_VUE --> FILTER
+    BI_TOOL --> FILTER
+
+    classDef mapStyle fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef biStyle fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef filterStyle fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+
+    class MAP_VUE,MAP_FEATURES mapStyle
+    class BI_TOOL,BI_FEATURES biStyle
+    class FILTER filterStyle
 ```
 
 **职责划分**：
@@ -609,19 +668,31 @@ User (用户) ←→ UserRole (用户角色关联) ←→ Role (角色) ←→ R
 
 #### 5.1 用户状态机
 
-```
-+-----------------------------------------------------------+
-|                        用户状态机                          |
-+-----------------------------------------------------------+
-|                            |                              |
-|    +------+     +------+     +------+     +------+        |
-|    | 待激活| --> |  正常| --> | 锁定 | --> | 已删除|        |
-|    +------+     +------+     +------+     +------+        |
-|                      |                                    |
-|                      | 禁用/锁定                           |
-|                      v                                    |
-|                   锁定状态                                 |
-+-----------------------------------------------------------+
+```mermaid
+stateDiagram-v2
+    [*] --> PENDING
+
+    PENDING --> NORMAL: 激活
+    NORMAL --> LOCKED: 禁用/锁定
+    LOCKED --> NORMAL: 解锁
+    NORMAL --> DELETED: 删除
+    LOCKED --> DELETED: 删除
+
+    note right of PENDING
+        待激活
+    end note
+
+    note right of NORMAL
+        正常
+    end note
+
+    note right of LOCKED
+        锁定
+    end note
+
+    note right of DELETED
+        已删除
+    end note
 ```
 
 **状态枚举**：
@@ -639,53 +710,45 @@ public enum UserStatus {
 
 #### 5.2 认证授权流程
 
-```
-+-----------------------------------------------------------+
-|                     认证授权流程                          |
-+-----------------------------------------------------------+
-|                                                           |
-|     客户端                      服务端                    |
-|       |                          |                        |
-|       |   1.登录请求               |                        |
-|       |   (account+password)      |                        |
-|       | -------->                 |                        |
-|       |                          |                        |
-|       |                          | 2.验证用户名密码         |
-|       |                          | 3.检查用户状态          |
-|       |                          | 4.生成JWT Token          |
-|       |   <--------               |                        |
-|       |   {token, userInfo,       |                        |
-|       |    roles, permissions}    |                        |
-|       |                          |                        |
-|       |   5.后续请求               |                        |
-|       |   (携带Token)             |                        |
-|       | -------->                 |                        |
-|       |                          | 6.JWT解析+权限校验       |
-|       |   <--------               |                        |
-|       |   响应数据                 |                        |
-|                                                           |
-+-----------------------------------------------------------+
+```mermaid
+sequenceDiagram
+    participant Client as 客户端
+    participant Server as 服务端
+
+    Client->>Server: 1. 登录请求<br/>(account + password)
+    Server->>Server: 2. 验证用户名密码
+    Server->>Server: 3. 检查用户状态
+    Server->>Server: 4. 生成JWT Token
+    Server-->>Client: {token, userInfo,<br/>roles, permissions}
+
+    Client->>Server: 5. 后续请求<br/>(携带Token)
+    Server->>Server: 6. JWT解析 + 权限校验
+    Server-->>Client: 响应数据
 ```
 
 #### 5.3 RBAC权限模型
 
-```
-+-----------------------------------------------------------+
-|                      RBAC 权限模型                         |
-+-----------------------------------------------------------+
-|                                                           |
-|   +----------+       +----------+       +----------+        |
-|   |   User   | <---> |   Role   | <---> |Permission |        |
-|   +----------+       +----------+       +----------+        |
-|        ^                                      ^            |
-|        |                                      |            |
-|   +----------+                              +------------+  |
-|   |DataScope |                              |  Resource  |  |
-|   +----------+                              +------------+  |
-|                                                           |
-|   权限粒度：模块 -> 功能 -> 操作 (CRUD)                     |
-|   数据权限：全部 | 本部门 | 仅本人 | 自定义                    |
-+-----------------------------------------------------------+
+```mermaid
+flowchart LR
+    USER["User<br/>用户"]
+    ROLE["Role<br/>角色"]
+    PERMISSION["Permission<br/>权限"]
+    DATASCOPE["DataScope<br/>数据权限范围"]
+    RESOURCE["Resource<br/>资源"]
+
+    USER <--> ROLE
+    ROLE <--> PERMISSION
+    USER --> DATASCOPE
+    PERMISSION --> RESOURCE
+
+    NOTE1["权限粒度：<br/>模块 → 功能 → 操作 (CRUD)"]
+    NOTE2["数据权限：<br/>全部 | 本部门 | 仅本人 | 自定义"]
+
+    classDef entityStyle fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef noteStyle fill:#f3e5f5,stroke:#4a148c,stroke-width:1px
+
+    class USER,ROLE,PERMISSION,DATASCOPE,RESOURCE entityStyle
+    class NOTE1,NOTE2 noteStyle
 ```
 
 #### 5.4 数据权限设计
@@ -987,33 +1050,43 @@ public class DataScopeInterceptor implements InnerInterceptor {
 
 #### 5.7 用户注册流程
 
+```mermaid
+flowchart LR
+    subgraph ADMIN["方式一：管理员创建（企业内常用）"]
+        direction TB
+        A1["填写基本信息"]
+        A2["生成随机密码"]
+        A3["发送激活通知"]
+        A4["首次登录改密"]
+        A5["状态→正常"]
+
+        A1 --> A2 --> A3 --> A4 --> A5
+    end
+
+    subgraph SELF["方式二：自主注册（可选）"]
+        direction TB
+        B1["填写注册信息"]
+        B2["发送验证码"]
+        B3["创建用户(待激活)"]
+        B4["发送激活邮件"]
+        B5["用户激活"]
+        B6["设置初始密码"]
+        B7["状态→正常"]
+
+        B1 --> B2 --> B3 --> B4 --> B5 --> B6 --> B7
+    end
+
+    classDef stepStyle fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+
+    class A1,A2,A3,A4,A5,B1,B2,B3,B4,B5,B6,B7 stepStyle
 ```
-+-----------------------------------------------------------+
-|                      用户注册流程                           |
-+-----------------------------------------------------------+
-|                                                           |
-|  方式一：管理员创建（企业内常用）                            |
-|  +-----------------------------------------------------+   |
-|  | 1. 管理员填写用户基本信息（用户名、姓名、邮箱/手机）   |   |
-|  | 2. 系统生成初始随机密码                               |   |
-|  | 3. 发送激活邮件/短信（含初始密码）                     |   |
-|  | 4. 用户首次登录强制修改密码                           |   |
-|  | 5. 修改成功后状态变为"正常"                          |   |
-|  +-----------------------------------------------------+   |
-|                                                           |
-|  方式二：自主注册（可选，根据企业安全策略决定）             |
-|  +-----------------------------------------------------+   |
-|  | 1. 用户填写注册信息（用户名、姓名、邮箱/手机）       |   |
-|  | 2. 发送验证码（邮件/短信）                            |   |
-|  | 3. 验证通过后创建用户，状态为"待激活"                 |   |
-|  | 4. 发送激活邮件/短信                                  |   |
-|  | 5. 用户点击激活链接或输入激活码                      |   |
-|  | 6. 设置初始密码                                      |   |
-|  | 7. 激活完成，状态变为"正常"                         |   |
-|  +-----------------------------------------------------+   |
-|                                                           |
-+-----------------------------------------------------------+
-```
+
+**流程说明**：
+
+| 方式 | 步骤 |
+|------|------|
+| **管理员创建** | 1.填写基本信息(用户名/姓名/邮箱/手机) → 2.生成随机密码 → 3.发送激活邮件/短信 → 4.首次登录强制修改密码 → 5.状态变为正常 |
+| **自主注册** | 1.填写注册信息 → 2.发送验证码 → 3.创建用户(待激活) → 4.发送激活邮件 → 5.点击激活链接/输入激活码 → 6.设置初始密码 → 7.状态变为正常 |
 
 #### 5.8 菜单权限设计
 
@@ -1445,31 +1518,50 @@ public Result<?> handleException(Exception e) {
 
 ## 九、部署架构
 
-```
-+-------------------------------------------------------------------------+
-|                        生产环境部署图                                   |
-+-------------------------------------------------------------------------+
-|                                                                         |
-|   +-------------+                                                       |
-|   |    Nginx    |  (反向代理 + SSL + 静态资源)                          |
-|   +-----+-----+                                                       |
-|         |                                                              |
-|   +-----+-----+     +-------------+     +-------------+               |
-|   | App Server  | -->|    MySQL    |     |    Redis    |               |
-|   | (2 instances)|   |   (Master)  |     |  (Cluster)   |               |
-|   +-------------+   +-----+-----+     +-------------+               |
-|                            |                                          |
-|                       +----+----+                                    |
-|                       |  MySQL  |                                    |
-|                       |  Slave  |                                    |
-|                       +---------+                                    |
-|                                                                         |
-|   +-------------+     +-------------+     +-------------+               |
-|   |   MinIO     |     |     ES      |     |  XXL-Job    |               |
-|   | (文件存储)  |     | (全文检索)  |     | (定时任务)  |               |
-|   +-------------+     +-------------+     +-------------+               |
-|                                                                         |
-+-------------------------------------------------------------------------+
+```mermaid
+flowchart TB
+    subgraph PROD["生产环境部署"]
+        NGINX["Nginx<br/>反向代理 + SSL + 静态资源"]
+
+        subgraph APP["应用层"]
+            APP_SERVER["App Server<br/>(2 instances)"]
+        end
+
+        subgraph DB["数据库层"]
+            MYSQL_M["MySQL Master"]
+            MYSQL_S["MySQL Slave"]
+        end
+
+        subgraph CACHE["缓存层"]
+            REDIS["Redis<br/>Cluster"]
+        end
+
+        subgraph STORAGE["存储与检索"]
+            MINIO["MinIO<br/>文件存储"]
+            ES["Elasticsearch<br/>全文检索"]
+            XXL["XXL-Job<br/>定时任务"]
+        end
+    end
+
+    NGINX --> APP_SERVER
+    APP_SERVER --> MYSQL_M
+    APP_SERVER --> REDIS
+    MYSQL_M --> MYSQL_S
+    APP_SERVER --> MINIO
+    APP_SERVER --> ES
+    APP_SERVER --> XXL
+
+    classDef gatewayStyle fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef appStyle fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef dbStyle fill:#f3e5f5,stroke:#4a148c,stroke-width:1px
+    classDef cacheStyle fill:#e8f5e9,stroke:#1b5e20,stroke-width:1px
+    classDef storageStyle fill:#fce4ec,stroke:#880e4f,stroke-width:1px
+
+    class NGINX gatewayStyle
+    class APP_SERVER appStyle
+    class MYSQL_M,MYSQL_S dbStyle
+    class REDIS cacheStyle
+    class MINIO,ES,XXL storageStyle
 ```
 
 ---

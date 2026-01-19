@@ -15,7 +15,6 @@ import java.util.stream.Collectors;
 /**
  * 全局异常处理器
  *
- * @author Order Platform Team
  */
 @Slf4j
 @RestControllerAdvice

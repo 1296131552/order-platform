@@ -6,8 +6,17 @@ import com.company.order.visual.user.dto.*;
 public interface UserService {
     /**
      * 用户登录
-    */
+     */
     LoginResponse login(LoginRequest request);
+
+    /**
+     * 用户登出
+     * <p>
+     * 将Token加入黑名单，并移除活跃Token记录
+     *
+     * @param token JWT Token
+     */
+    void logout(String token);
 
     /**
      * # TODO 创建用户
