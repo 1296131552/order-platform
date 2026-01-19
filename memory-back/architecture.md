@@ -88,6 +88,43 @@ com.company.order.visual
 | `ShipmentStatus.java` | 发运状态枚举 | `@EnumValue` 统一存储策略 |
 | `ShipmentLineStatus.java` | 快递单状态枚举 | `@EnumValue` 统一存储策略，明确 DELIVERED vs RECEIVED |
 
+#### 安全认证 (security/)
+
+| 文件 | 职责 | 关键设计 |
+|------|------|----------|
+| `JwtService.java` | JWT 核心服务 | 生成/解析/验证 Token，HmacSHA384 签名 |
+| `TokenInfo.java` | Token 值对象 | 封装 userId, tokenId, version, expiration；工厂方法创建；NPE 防御 |
+| `TokenBlacklistService.java` | 黑名单管理 | Redis 存储，TTL = 剩余有效时间，故障时 Fail-Open |
+| `RedisKeyConstants.java` | Redis 键常量 | 黑名单/版本号/活跃 Token 的键前缀与 TTL 常量 |
+| `JwtProperties.java` | JWT 配置属性 | @ConfigurationProperties 绑定 application.yml |
+| `CustomAuthenticationEntryPoint.java` | 未认证响应 | 返回 401 而非重定向，适配前后端分离 |
+
+
+**JWT Token 结构**：
+```
+Header: {"alg":"HS384","typ":"JWT"}
+Payload: {
+  "sub": userId,              # 用户ID
+  "jti": tokenId,             # Token唯一标识（UUID）
+  "version": tokenVersion,    # 版本号（密码重置后递增）
+  "exp": expiration           # 过期时间（Unix秒级时间戳）
+}
+Signature: HmacSHA384(secretKey, header.payload)
+```
+
+**Redis 数据结构**：
+```
+auth:blacklist:{tokenId}  →  SET/TTL (过期时间戳，TTL=Token剩余时间)
+auth:version:{userId}     →  STRING (当前版本号，TTL=30天)
+auth:active:{userId}      →  SET (活跃tokenId列表，TTL=7天)
+```
+
+**版本号机制**：
+- 首次登录：version = 1
+- 已登录：刷新 TTL（防止活跃用户版本号过期）
+- 密码重置：version++（所有旧 Token 失效）
+- 认证验证：Token.version == Redis.version
+
 ### 订单聚合 (order-platform-order)
 
 | 文件 | 职责 | 关键设计 |
@@ -129,12 +166,24 @@ com.company.order.visual.user/
 
 #### Controller 层
 
+##### AuthController.java
+**职责**：认证 API 入口，处理登录/登出
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| `login(LoginRequest)` | POST /api/auth/login | 用户登录，返回 JWT Token |
+| `logout()` | POST /api/auth/logout | 用户登出，Token 加入黑名单 |
+
+**关键设计**：
+- 无状态认证，Token 存储在客户端
+- 登录成功返回 Token 和用户信息
+- 登出通过黑名单机制实现（服务端标记 Token 无效）
+
 ##### UserController.java
 **职责**：用户管理 API 入口，处理 HTTP 请求/响应
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| `login(LoginRequest)` | POST /api/users/login | 用户登录，支持用户名/邮箱/手机号 |
 | `getUserById(Long)` | GET /api/users/{userId} | 根据ID查询用户详细信息 |
 | `pageUsers(UserQueryRequest)` | GET /api/users/list | 分页查询用户，支持多条件筛选 |
 
@@ -142,12 +191,60 @@ com.company.order.visual.user/
 - 使用 `@Tag` 和 `@Operation` 提供 Swagger 文档
 - 统一返回 `Result<T>` 格式
 - `@Valid` 触发参数校验
+- 登录接口迁移至 AuthController（单一职责）
 
 **TODO**：
-- POST /api/users/logout - 退出登录
 - POST /api/users/create - 创建用户
 - PUT /api/users/update - 更新用户
 - DELETE /api/users/delete/{userId} - 删除用户
+
+#### Filter 层
+
+##### JwtAuthenticationFilter.java
+**职责**：JWT 认证过滤器，拦截所有 HTTP 请求进行身份验证
+
+**执行流程**：
+```
+1. 检查已认证状态 → 已认证则跳过
+2. 提取 Authorization Header → Bearer {token}
+3. 解析 JWT Token → 获取 userId, tokenId, version
+4. 验证 Token 有效性 → 检查过期、签名
+5. 检查黑名单 → tokenId 是否在黑名单中
+6. 验证版本号 → Token.version == Redis.version
+7. 加载用户详情 → 设置 SecurityContext
+8. 继续过滤器链
+```
+
+**关键设计**：
+- 继承 `OncePerRequestFilter`，确保每请求只执行一次
+- 无 Token 时跳过认证（匿名访问）
+- Redis 故障时放行（Fail-Open 策略）
+- finally 块保证 doFilter 一定会被调用
+
+#### Config 层
+
+##### SecurityConfig.java
+**职责**：Spring Security 配置，定义认证规则
+
+**配置内容**：
+- 禁用 CSRF（前后端分离不需要）
+- 禁用 Session（无状态认证）
+- 配置异常处理入口（CustomAuthenticationEntryPoint）
+- 注册 JwtAuthenticationFilter
+- 白名单路径：/api/auth/login, /doc.html 等
+
+##### UserDetailsServiceImpl.java
+**职责**：UserDetailsService 实现，为 SecurityContext 提供用户详情
+
+**方法签名**：
+```java
+public UserDetails loadUserById(Long userId) throws UsernameNotFoundException;
+```
+
+**关键设计**：
+- 实现 Spring Security 的 UserDetails 接口
+- 查询用户 + 角色权限
+- 将用户状态映射为 enabled/locked/accountExpired
 
 ---
 
@@ -160,6 +257,7 @@ com.company.order.visual.user/
 ```java
 // 用户认证
 LoginResponse login(LoginRequest request);
+void logout(String rawToken);
 
 // 用户查询
 UserVO getUserById(Long userId);
@@ -184,23 +282,34 @@ Page<UserVO> pageUsers(UserQueryRequest request);
 - `UserMapper` - 用户数据访问
 - `UserRoleMapper` - 角色数据访问
 - `UserConverter` - 实体转换
-- `BCryptPasswordEncoder` - 密码加密
+- `PasswordEncoder` - 密码加密（BCrypt）
+- `JwtService` - JWT Token 生成/解析
+- `TokenBlacklistService` - 黑名单管理
 
 **核心方法**：
 
 | 方法 | 职责 | 关键逻辑 |
 |------|------|----------|
-| `login()` | 用户登录 | 1. 按账号查找用户<br>2. 验证状态（启用/锁定/删除）<br>3. BCrypt 验证密码<br>4. 更新登录信息<br>5. 返回用户信息和 token |
+| `login()` | 用户登录 | 1. 按账号查找用户<br>2. 验证状态（启用/锁定/删除）<br>3. BCrypt 验证密码<br>4. 获取/初始化 Token 版本号<br>5. 生成 JWT Token<br>6. 记录活跃 Token<br>7. 异步更新登录信息 |
+| `logout()` | 用户登出 | 1. 解析 Token 获取 tokenId/userId<br>2. 加入黑名单（TTL=剩余时间）<br>3. 清除活跃 Token |
 | `findUserByAccount()` | 按账号查询 | 依次尝试 username/email/phone 字段 |
 | `validateUserForLogin()` | 验证登录状态 | 检查 isEnabled, isLocked, isDeleted<br>检查是否锁定过期 |
-| `updateLoginInfo()` | 更新登录信息 | 更新最后登录时间、IP、登录次数 |
+| `updateLoginInfoAsync()` | 异步更新登录信息 | 更新最后登录时间、IP、登录次数 |
 | `getUserById()` | 获取用户详情 | 查询用户 + 加载角色列表 |
 | `pageUsers()` | 分页查询 | 动态构建查询条件 + 批量加载角色 |
 | `buildQueryWrapper()` | 构建查询条件 | 17 个可选条件的动态组装 |
 | `getUserByIdOrThrow()` | 获取或抛出 | 不存在或已删除时抛出异常 |
 
 **事务管理**：
-- `@Transactional` - 登录操作保证原子性
+- `login()` - 无事务（Token 生成先于数据库操作）
+- `updateLoginInfoAsync()` - `@Transactional` + `@Async`
+
+**Token 生成顺序**（重要）：
+1. 验证用户状态和密码
+2. 获取/初始化 Token 版本号
+3. 生成 JWT Token（不加事务，避免数据库失败导致 Token 丢失）
+4. 记录活跃 Token
+5. 异步更新登录信息（不阻塞返回）
 
 **查询条件支持**（17 个）：
 - 账号信息：username, userCode, email, phone（模糊）
@@ -315,7 +424,7 @@ List<UserVO> toVO(List<User> users);
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | user | UserVO | 用户信息（复用 UserVO） |
-| token | String | JWT Token（当前返回 null，TODO） |
+| token | String | JWT Token（已实现） |
 
 ---
 
@@ -398,31 +507,44 @@ public static class RoleInfo {
 
 #### 架构设计要点
 
-1. **多账号登录**
+1. **无状态认证**
+   - JWT Token 存储在客户端（Authorization Header）
+   - 服务端通过黑名单实现登出（而非会话销毁）
+   - Redis 故障时放行（Fail-Open），优先保证可用性
+
+2. **Token 版本号机制**
+   - 密码重置后版本号递增，所有旧 Token 失效
+   - 版本号 TTL 30 天，防止活跃用户版本号过期导致旧 Token 复活
+   - 登录时刷新版本号 TTL
+
+3. **黑名单过期策略**
+   - TTL = Token 剩余有效时间
+   - Token 过期后黑名单键自动清理，无需人工维护
+
+4. **多账号登录**
    - 统一 `account` 字段接收
    - 依次尝试 username/email/phone 匹配
    - 前端无需区分账号类型
 
-2. **性能优化**
+5. **性能优化**
    - 批量角色查询消除 N+1 问题
    - Converter 层统一转换逻辑
    - 动态查询条件构建
 
-3. **安全设计**
+6. **安全设计**
    - BCrypt 密码加密（单向哈希）
+   - HmacSHA384 JWT 签名（比 HS256 更强）
    - 账号锁定机制（isLocked + lockedTime）
    - 软删除保护（isDeleted）
 
-4. **扩展性**
-   - 预留 JWT token 字段
-   - 预留密码管理接口
-   - 角色权限计算取 MIN 值（最宽松）
+7. **异步更新**
+   - 登录信息异步更新（不阻塞返回）
+   - 采用最终一致性
 
-5. **TODO 事项**
-   - JWT Token 生成与验证（P0）
-   - 认证拦截器（P0）
-   - 退出登录（P0）
+8. **TODO 事项**
    - 用户 CRUD（P1）
+   - 密码管理接口（P2）
+   - 权限注解与拦截（P2）
 
 ---
 

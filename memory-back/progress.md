@@ -297,7 +297,7 @@ t_user_role: 8 字段
 
 **待完成**：
 - [x] plan_22 - 用户管理（登录/查询接口）
-- [ ] plan_04 - JWT 认证功能（P0）
+- [x] plan_04 - JWT 认证功能（P0）
 - [ ] plan_22 - 用户 CRUD 接口（P1）
 - [ ] plan_56 - API 启动模块配置（Knife4j 文档）
 
@@ -410,7 +410,170 @@ order-platform-backend/order-platform-user/src/main/java/.../user/
 ```
 
 #### 待完成
-- [ ] plan_04 - JWT 认证功能（P0）
+- [x] plan_04 - JWT 认证功能（P0）
+- [ ] plan_22 - 用户 CRUD 接口（P1）
+- [ ] plan_56 - API 启动模块配置（Knife4j 文档）
+
+---
+
+## 2026-01-20
+
+### plan_04：JWT 认证系统（已完成）
+
+#### 完成内容
+
+**核心功能**：
+- JWT Token 生成与解析（HmacSHA384 签名）
+- Token 黑名单机制（Redis 存储，支持过期自动清理）
+- Token 版本号控制（密码重置后旧 Token 失效）
+- 登录/登出接口（AuthController）
+- Spring Security 集成（JwtAuthenticationFilter）
+
+**新增文件**：
+
+```
+order-platform-common/src/main/java/.../security/
+├── JwtService.java              # JWT 生成/解析/验证核心
+├── TokenInfo.java               # Token 信息封装（值对象）
+├── TokenBlacklistService.java   # 黑名单管理服务
+├── RedisKeyConstants.java       # Redis 键常量
+├── JwtProperties.java           # JWT 配置属性
+└── CustomAuthenticationEntryPoint.java  # 未认证响应处理
+
+order-platform-common/src/test/java/.../security/
+├── JwtServiceTest.java          # 22 个测试
+├── TokenInfoTest.java           # 12 个测试
+└── TokenBlacklistServiceTest.java  # 15 个测试
+
+order-platform-user/src/main/java/.../user/
+├── controller/
+│   └── AuthController.java      # 登录/登出接口
+├── filter/
+│   └── JwtAuthenticationFilter.java  # JWT 认证过滤器
+├── config/
+│   └── SecurityConfig.java      # Spring Security 配置
+└── service/impl/
+    └── UserDetailsServiceImpl.java  # UserDetailsService 实现
+
+order-platform-user/src/test/java/.../user/
+├── filter/
+│   └── JwtAuthenticationFilterTest.java  # 15 个测试
+└── service/impl/
+    └── UserServiceImplTest.java  # 27 个测试（含登录场景）
+```
+
+#### 技术决策
+
+| 决策 | 选择 | 理由 |
+|------|------|------|
+| 签名算法 | HmacSHA384 | 比 HS256 更强，性能可接受 |
+| Token 格式 | JWT | 无状态，支持跨服务 |
+| 黑名单存储 | Redis SET | 自动过期，防止内存泄漏 |
+| 版本号机制 | Redis String | 密码重置后旧 Token 全部失效 |
+| 过期策略 | Token 剩余时间作为 TTL | 黑名单键随 Token 过期自动清理 |
+| 故障策略 | Fail-Open | Redis 故障时放行，优先保证可用性 |
+
+#### JWT Token 结构
+
+```
+Header: {"alg":"HS384","typ":"JWT"}
+Payload: {
+  "sub": "12345",           # userId
+  "jti": "uuid-v4",         # tokenId（唯一）
+  "version": 1,             # tokenVersion
+  "exp": 1705440000         # 过期时间（秒级）
+}
+Signature: HmacSHA384(secret, header.payload)
+```
+
+#### 认证流程
+
+```
+1. 登录请求 → AuthController.login()
+   ├── 验证用户状态和密码
+   ├── 获取/初始化 Token 版本号
+   ├── 生成 JWT Token（含 userId, version）
+   ├── 记录活跃 Token（用于追踪）
+   └── 异步更新登录信息
+
+2. API 请求 → JwtAuthenticationFilter
+   ├── 提取 Authorization Header
+   ├── 解析 JWT Token
+   ├── 检查黑名单（tokenId）
+   ├── 验证版本号（防旧 Token 复活）
+   ├── 加载用户详情到 SecurityContext
+   └── 继续过滤器链
+
+3. 登出请求 → AuthController.logout()
+   ├── 解析 Token 获取 tokenId
+   ├── 加入黑名单（TTL = 剩余有效时间）
+   └── 移除活跃 Token 记录
+```
+
+#### 黑名单机制
+
+**Redis 数据结构**：
+```
+auth:blacklist:{tokenId}  →  过期时间戳 (TTL = 剩余毫秒)
+auth:version:{userId}     →  当前版本号 (TTL = 30天)
+auth:active:{userId}      →  SET(tokenId, ...) (TTL = 7天)
+```
+
+**版本号策略**：
+- 首次登录：初始化 version = 1
+- 已有版本：刷新 TTL（防止活跃用户版本号过期）
+- 密码重置：version++（所有旧 Token 失效）
+- 请求验证：Token.version == Redis.version
+
+#### 单元测试覆盖（49 个测试全部通过）
+
+| 测试类 | 场景数 | 覆盖内容 |
+|--------|--------|----------|
+| JwtServiceTest | 22 | Token 生成、解析、签名验证、过期处理、往返一致性 |
+| TokenInfoTest | 12 | 工厂方法、NPE 防御、剩余时间计算 |
+| TokenBlacklistServiceTest | 15 | 黑名单操作、版本号管理、活跃 Token 追踪、Redis 故障处理 |
+| UserServiceImplTest | 27 | 登录成功/失败、登出、Token 生成顺序、用户状态校验 |
+| JwtAuthenticationFilterTest | 15 | 无 Token 场景、无效 Token、黑名单、版本号校验、异常处理 |
+
+#### 代码审查修复
+
+| 优先级 | 问题 | 修复方案 |
+|--------|------|----------|
+| 🟢 P2 | JWT 秒级精度 | 往返比较使用秒级时间戳 |
+| 🟢 P2 | 时间流逝误差 | Token 剩余时间使用范围比较（±1秒） |
+| 🟢 P2 | Filter doFilter 多次调用 | 测试使用 atLeastOnce() 验证 |
+| 🟢 P2 | UnnecessaryStubbing | 移除用户禁用/锁定场景的 passwordEncoder.stub |
+
+#### 配置变更
+
+```yaml
+# application.yml 新增
+jwt:
+  secret: ${JWT_SECRET:your-256-bit-secret-key-change-in-production}
+  expiration: 604800000  # 7天（毫秒）
+```
+
+```xml
+<!-- pom.xml 新增依赖 -->
+<dependency>
+    <groupId>io.jsonwebtoken</groupId>
+    <artifactId>jjwt-api</artifactId>
+</dependency>
+<dependency>
+    <groupId>io.jsonwebtoken</groupId>
+    <artifactId>jjwt-impl</artifactId>
+</dependency>
+<dependency>
+    <groupId>io.jsonwebtoken</groupId>
+    <artifactId>jjwt-jackson</artifactId>
+</dependency>
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-data-redis</artifactId>
+</dependency>
+```
+
+#### 待完成
 - [ ] plan_22 - 用户 CRUD 接口（P1）
 - [ ] plan_56 - API 启动模块配置（Knife4j 文档）
 
