@@ -1,5 +1,6 @@
 package com.company.order.visual.common.response;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 /**
@@ -9,26 +10,30 @@ import lombok.Data;
  * @author Order Platform Team
  */
 @Data
+@Schema(description = "统一响应结果封装")
 public class Result<T> {
 
-    /**
-     * 状态码
-     */
+    @Schema(
+            description = "状态码（200=成功，500=失败，其他自定义码）",
+            example = "200"
+    )
     private Integer code;
 
-    /**
-     * 响应消息
-     */
+    @Schema(
+            description = "响应消息",
+            example = "success"
+    )
     private String message;
 
-    /**
-     * 响应数据
-     */
+    @Schema(
+            description = "响应数据（泛型，具体类型由接口决定）"
+    )
     private T data;
 
-    /**
-     * 时间戳
-     */
+    @Schema(
+            description = "服务端时间戳（毫秒）",
+            example = "1705334400000"
+    )
     private Long timestamp;
 
     public Result() {

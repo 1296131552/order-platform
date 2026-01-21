@@ -9,14 +9,20 @@ import com.company.order.visual.common.security.RedisKeyConstants;
 import com.company.order.visual.common.security.TokenBlacklistService;
 import com.company.order.visual.common.security.TokenInfo;
 import com.company.order.visual.user.converter.UserConverter;
+import com.company.order.visual.user.converter.UserMapping;
 import com.company.order.visual.user.dto.*;
+import com.company.order.visual.user.entity.Role;
 import com.company.order.visual.user.entity.User;
+import com.company.order.visual.user.entity.UserRole;
+import com.company.order.visual.user.mapper.RoleMapper;
 import com.company.order.visual.user.mapper.UserMapper;
 import com.company.order.visual.user.mapper.UserRoleMapper;
 import com.company.order.visual.user.service.UserService;
-import jakarta.annotation.Resource;
+
+import cn.hutool.core.collection.CollectionUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.scheduling.annotation.Async;
@@ -39,15 +45,11 @@ import java.util.List;
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
 
-    @Resource
-    private UserMapper userMapper;
-
-    @Resource
-    private UserRoleMapper userRoleMapper;
-
-    @Resource
-    private UserConverter userConverter;
-
+    private final UserMapper userMapper;
+    private final UserRoleMapper userRoleMapper;
+    private final RoleMapper roleMapper;
+    private final UserConverter userConverter;
+    private final UserMapping userMapping;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final TokenBlacklistService tokenBlacklistService;
@@ -130,7 +132,7 @@ public class UserServiceImpl implements UserService {
                 .and(w -> w.eq(User::getUsername, account)
                         .or().eq(User::getEmail, account)
                         .or().eq(User::getPhone, account));
-
+    
         User user = userMapper.selectOne(wrapper);
         if (user == null) {
             throw new BusinessException(ResponseCode.LOGIN_FAILED);
@@ -158,20 +160,15 @@ public class UserServiceImpl implements UserService {
     /**
      * 异步更新用户登录信息
      * <p>
-     * 采用最终一致性，不阻塞登录返回
-     * 使用@Transactional确保数据一致性
+     * 采用最终一致性，不阻塞登录返回。
+     * 使用数据库级别的原子操作（login_count + 1），避免并发覆盖丢失。
      */
     @Async
-    @Transactional(rollbackFor = Exception.class)
     public void updateLoginInfoAsync(Long userId) {
         try {
-            User user = userMapper.selectById(userId);
-            if (user != null) {
-                user.setLastLoginTime(LocalDateTime.now());
-                user.setLoginCount(user.getLoginCount() + 1);
-                userMapper.updateById(user);
-                log.debug("异步更新登录信息成功, userId={}", userId);
-            }
+            // 直接使用数据库原子操作，避免先读后写导致的并发丢失问题
+            userMapper.updateLoginInfo(userId);
+            log.debug("异步更新登录信息成功, userId={}", userId);
         } catch (Exception e) {
             log.error("异步更新登录信息失败, userId={}", userId, e);
             // 不抛出异常，避免影响主流程
@@ -179,7 +176,59 @@ public class UserServiceImpl implements UserService {
     }
 
     // ==================== 创建用户 ====================
-    // TODO: 实现创建用户功能
+
+    /**
+     * 创建用户
+     * <p>
+     * 重构说明：
+     * - 移除 selectCount 校验，由数据库唯一索引保证并发安全
+     * - 捕获 DuplicateKeyException 转换为业务异常
+     * - 角色校验过滤 isDeleted 和 isEnabled
+     * - 使用 MapStruct 消除 setter 冗余代码
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Long createUser(UserCreateRequest request, Long operatorId) {
+        // 1. 校验角色是否存在且有效（未删除且已启用）
+        if (CollectionUtil.isNotEmpty(request.getRoleIds())) {
+            long validCount = roleMapper.selectCount(new LambdaQueryWrapper<Role>()
+                    .in(Role::getId, request.getRoleIds())
+                    .eq(Role::getIsDeleted, false)
+                    .eq(Role::getIsEnabled, true));
+            if (validCount != request.getRoleIds().size()) {
+                throw new BusinessException(ResponseCode.ROLE_NOT_FOUND);
+            }
+        }
+
+        // 2. 使用 MapStruct 构建用户实体
+        User user = userMapping.toEntity(request);
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+
+        // 3. 保存用户（唯一索引保证用户名唯一，并发安全）
+        try {
+            userMapper.insert(user);
+        } catch (DuplicateKeyException e) {
+            throw new BusinessException(ResponseCode.USER_ALREADY_EXISTS);
+        }
+
+        // 4. 分配角色（审计字段自动填充）
+        if (CollectionUtil.isNotEmpty(request.getRoleIds())) {
+            for (Long roleId : request.getRoleIds()) {
+                UserRole userRole = new UserRole();
+                userRole.setUserId(user.getId());
+                userRole.setRoleId(roleId);
+                userRole.setIsPrimary(false);
+                userRoleMapper.insert(userRole);
+            }
+        }
+
+        log.info("创建用户成功, userId={}, username={}, roleCount={}, operatorId={}",
+                user.getId(), user.getUsername(),
+                request.getRoleIds() != null ? request.getRoleIds().size() : 0,
+                operatorId);
+
+        return user.getId();
+    }
 
     // ==================== 更新/删除 ====================
     // TODO: 实现更新、删除功能
@@ -212,6 +261,8 @@ public class UserServiceImpl implements UserService {
 
     /**
      * 构建查询条件
+     * <p>
+     * 注意：userCode 不再存储在数据库中，如果按 userCode 查询，转换为 id 查询
      */
     private LambdaQueryWrapper<User> buildQueryWrapper(UserQueryRequest request) {
         LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<User>()
@@ -221,8 +272,12 @@ public class UserServiceImpl implements UserService {
         if (StringUtils.hasText(request.getUsername())) {
             wrapper.like(User::getUsername, request.getUsername());
         }
+        // userCode 查询转换为 id 查询（USER0000000001 -> 1）
         if (StringUtils.hasText(request.getUserCode())) {
-            wrapper.like(User::getUserCode, request.getUserCode());
+            Long userId = parseUserIdFromCode(request.getUserCode());
+            if (userId != null) {
+                wrapper.eq(User::getId, userId);
+            }
         }
         if (StringUtils.hasText(request.getEmail())) {
             wrapper.like(User::getEmail, request.getEmail());
@@ -288,5 +343,23 @@ public class UserServiceImpl implements UserService {
             throw new BusinessException(ResponseCode.USER_NOT_FOUND);
         }
         return user;
+    }
+
+    /**
+     * 从 userCode 解析出 userId
+     * <p>
+     * 格式：USER0000000001 -> 1
+     * <p>
+     * 如果格式不匹配，返回 null
+     */
+    private Long parseUserIdFromCode(String userCode) {
+        if (userCode == null || !userCode.startsWith("USER")) {
+            return null;
+        }
+        try {
+            return Long.parseLong(userCode.substring(4));
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 }

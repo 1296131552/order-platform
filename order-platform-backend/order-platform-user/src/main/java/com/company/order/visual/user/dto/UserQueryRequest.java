@@ -1,5 +1,6 @@
 package com.company.order.visual.user.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import java.time.LocalDateTime;
 
@@ -7,68 +8,69 @@ import java.time.LocalDateTime;
  * 用户查询请求
  */
 @Data
+@Schema(description = "用户分页查询请求")
 public class UserQueryRequest {
 
     // ==================== 账号信息（模糊查询）====================
 
-    /** 用户名（模糊） */
+    @Schema(description = "用户名（模糊查询）", example = "admin")
     private String username;
 
-    /** 用户编码（模糊）- 企业场景常用 */
+    @Schema(description = "用户编码（模糊查询）", example = "U001")
     private String userCode;
 
-    /** 邮箱（模糊）- 管理员常用 */
+    @Schema(description = "邮箱（模糊查询）", example = "admin@example.com")
     private String email;
 
-    /** 手机号（模糊）- 管理员常用 */
+    @Schema(description = "手机号（模糊查询）", example = "138")
     private String phone;
 
     // ==================== 基本信息 ====================
 
-    /** 真实姓名（模糊） */
+    @Schema(description = "真实姓名（模糊查询）", example = "张三")
     private String realName;
 
-    /** 职位（模糊） */
+    @Schema(description = "职位（模糊查询）", example = "系统管理员")
     private String position;
 
-    /** 工号（模糊） */
+    @Schema(description = "工号（模糊查询）", example = "E001")
     private String employeeNo;
 
     // ==================== 状态筛选 ====================
 
-    /** 是否启用 */
+    @Schema(description = "是否启用", example = "true")
     private Boolean isEnabled;
 
-    /** 是否锁定 */
+    @Schema(description = "是否锁定", example = "false")
     private Boolean isLocked;
 
     // ==================== 组织与权限 ====================
 
-    /** 部门ID */
+    @Schema(description = "部门ID", example = "1")
     private Long departmentId;
 
-    /** 角色ID */
+    @Schema(description = "角色ID", example = "1")
     private Long roleId;
 
     // ==================== 时间范围 ====================
 
-    /** 创建时间-开始 */
+    @Schema(description = "创建时间-开始（格式：yyyy-MM-dd HH:mm:ss）", example = "2024-01-01T00:00:00")
     private LocalDateTime createdAtStart;
 
-    /** 创建时间-结束 */
+    @Schema(description = "创建时间-结束（格式：yyyy-MM-dd HH:mm:ss）", example = "2024-12-31T23:59:59")
     private LocalDateTime createdAtEnd;
 
-    /** 最后登录时间-开始（活跃用户分析） */
+    @Schema(description = "最后登录时间-开始", example = "2024-01-01T00:00:00")
     private LocalDateTime lastLoginTimeStart;
 
-    /** 最后登录时间-结束 */
+    @Schema(description = "最后登录时间-结束", example = "2024-12-31T23:59:59")
     private LocalDateTime lastLoginTimeEnd;
 
     // ==================== 分页 ====================
 
-    /** 页码，默认1 */
+    @Schema(description = "页码（从1开始）", example = "1", defaultValue = "1")
     private Integer pageNum = 1;
 
-    /** 每页大小，默认10 */
+    @Schema(description = "每页大小", example = "10", defaultValue = "10")
     private Integer pageSize = 10;
 }

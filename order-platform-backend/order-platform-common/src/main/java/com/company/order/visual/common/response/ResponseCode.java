@@ -35,7 +35,9 @@ public enum ResponseCode {
     USER_LOCKED(4003, "用户已锁定"),
     LOGIN_FAILED(4004, "用户名或密码错误"),
     TOKEN_INVALID(4005, "Token无效或已过期"),
-
+    USER_ALREADY_EXISTS(4006,"用户已经存在"),
+    ROLE_NOT_FOUND(4007,"指定角色不存在"),
+    
     // ========== 附件模块 ==========
     ATTACHMENT_NOT_FOUND(5001, "附件不存在"),
     ATTACHMENT_UPLOAD_FAILED(5002, "附件上传失败"),

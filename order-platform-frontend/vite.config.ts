@@ -17,7 +17,7 @@ export default defineConfig({
       // 前端请求：/api/xxx → 后端：http://localhost:8080/api/xxx
       // 注意：后端 spring.servlet.context-path=/api，所以不需要 rewrite
       '/api': {
-        target: 'http://localhost:8080',
+        target: 'http://localhost:8081',
         changeOrigin: true
       }
     }

@@ -11,6 +11,7 @@ import com.company.order.visual.user.converter.UserConverter;
 import com.company.order.visual.user.dto.LoginRequest;
 import com.company.order.visual.user.dto.LoginResponse;
 import com.company.order.visual.user.entity.User;
+import com.company.order.visual.user.mapper.RoleMapper;
 import com.company.order.visual.user.mapper.UserMapper;
 import com.company.order.visual.user.mapper.UserRoleMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,7 +19,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -42,6 +42,7 @@ import static org.mockito.Mockito.*;
  * - 异步更新登录信息（不阻塞返回）
  * - 用户状态校验：禁用/锁定用户拒绝登录
  * - P0-2修复：登录不加事务，Token生成在数据库操作前
+ * - 构造器注入：所有依赖通过 @RequiredArgsConstructor 注入
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("UserServiceImpl 单元测试")
@@ -54,7 +55,13 @@ class UserServiceImplTest {
     private UserRoleMapper userRoleMapper;
 
     @Mock
+    private RoleMapper roleMapper;
+
+    @Mock
     private UserConverter userConverter;
+
+    @Mock
+    private com.company.order.visual.user.converter.UserMapping userMapping;
 
     @Mock
     private PasswordEncoder passwordEncoder;
@@ -77,25 +84,17 @@ class UserServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        // 使用 @RequiredArgsConstructor 生成的构造函数
-        userService = new UserServiceImpl(passwordEncoder, jwtService, tokenBlacklistService);
-        // 使用反射注入 @Resource 依赖
-        setField(userService, "userMapper", userMapper);
-        setField(userService, "userRoleMapper", userRoleMapper);
-        setField(userService, "userConverter", userConverter);
-    }
-
-    /**
-     * 使用反射设置私有字段
-     */
-    private void setField(Object target, String fieldName, Object value) {
-        try {
-            java.lang.reflect.Field field = target.getClass().getDeclaredField(fieldName);
-            field.setAccessible(true);
-            field.set(target, value);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        // @RequiredArgsConstructor 生成的构造函数需要所有 final 依赖（共 8 个）
+        userService = new UserServiceImpl(
+                userMapper,
+                userRoleMapper,
+                roleMapper,
+                userConverter,
+                userMapping,
+                passwordEncoder,
+                jwtService,
+                tokenBlacklistService
+        );
     }
 
     // ==================== 登录成功场景 ====================

@@ -21,7 +21,7 @@ public interface UserService {
     /**
      * # TODO 创建用户
      */
-    // Long createUser(UserCreateRequest request);  
+    Long createUser(UserCreateRequest request,Long operatorId);  
 
     /**
      * # TODO 更新用户

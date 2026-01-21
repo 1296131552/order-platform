@@ -1,8 +1,6 @@
 package com.company.order.visual.user.entity;
 
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -12,6 +10,8 @@ import java.time.LocalDateTime;
  * <p>
  * 系统用户表,记录用户基本信息、账号信息、组织信息、安全状态等
  * 关系: User N:M Role (通过t_user_role中间表关联)
+ * <p>
+ * 审计字段自动填充：createdAt, createdBy, updatedAt, updatedBy, isDeleted 由 MetaObjectHandler 自动处理
  *
  * @author Order Platform Team
  */
@@ -106,12 +106,12 @@ public class User {
     // ==================== 密码管理 ====================
 
     /**
-     * 密码修改时间
+     * 密码修改时间 NULL表示从未修改
      */
     private LocalDateTime passwordChangedTime;
 
     /**
-     * 密码过期时间
+     * 密码过期时间 NULL表示永不过期
      */
     private LocalDateTime passwordExpireTime;
 
@@ -142,27 +142,32 @@ public class User {
     // ==================== 公共字段 ====================
 
     /**
-     * 创建时间
+     * 创建时间（自动填充）
      */
+    @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 
     /**
-     * 创建人ID（NULL表示系统创建）
+     * 创建人ID（自动填充，NULL表示系统创建）
      */
+    @TableField(fill = FieldFill.INSERT)
     private Long createdBy;
 
     /**
-     * 更新时间
+     * 更新时间（自动填充）
      */
+    @TableField(fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updatedAt;
 
     /**
-     * 更新人ID（NULL表示系统更新）
+     * 更新人ID（自动填充，NULL表示系统更新）
      */
+    @TableField(fill = FieldFill.INSERT_UPDATE)
     private Long updatedBy;
 
     /**
-     * 是否删除
+     * 是否删除（自动填充）
      */
+    @TableField(fill = FieldFill.INSERT)
     private Boolean isDeleted;
 }

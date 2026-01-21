@@ -1,8 +1,6 @@
 package com.company.order.visual.user.entity;
 
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -16,6 +14,8 @@ import java.time.LocalDateTime;
  * <p>
  * 权限计算: 用户数据权限取所有角色中的"最宽松"权限（dataScopeType 最小值）
  * 1=全部 > 2=部门 > 3=本人, 即 MIN(dataScopeType)
+ * <p>
+ * 审计字段自动填充：createdAt, createdBy, updatedAt, updatedBy, isDeleted 由 MetaObjectHandler 自动处理
  *
  * @author Order Platform Team
  */
@@ -53,27 +53,32 @@ public class UserRole {
     // ==================== 公共字段 ====================
 
     /**
-     * 创建时间
+     * 创建时间（自动填充）
      */
+    @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 
     /**
-     * 创建人ID（NULL表示系统创建）
+     * 创建人ID（自动填充，NULL表示系统创建）
      */
+    @TableField(fill = FieldFill.INSERT)
     private Long createdBy;
 
     /**
-     * 更新时间
+     * 更新时间（自动填充）
      */
+    @TableField(fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updatedAt;
 
     /**
-     * 更新人ID（NULL表示系统更新）
+     * 更新人ID（自动填充，NULL表示系统更新）
      */
+    @TableField(fill = FieldFill.INSERT_UPDATE)
     private Long updatedBy;
 
     /**
-     * 是否删除
+     * 是否删除（自动填充）
      */
+    @TableField(fill = FieldFill.INSERT)
     private Boolean isDeleted;
 }

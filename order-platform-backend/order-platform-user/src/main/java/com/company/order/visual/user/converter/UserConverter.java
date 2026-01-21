@@ -37,12 +37,14 @@ public class UserConverter {
 
     /**
      * User → UserVO（单个转换，角色已预加载）
+     * <p>
+     * userCode 不再从数据库读取，由 VO 的 getUserCode() 方法动态计算
      */
     public UserVO toVO(User user, List<UserVO.RoleInfo> roles) {
         return UserVO.builder()
                 .id(user.getId())
                 .username(user.getUsername())
-                .userCode(user.getUserCode())
+                // userCode 由 getter 动态计算，不再从数据库读取
                 .realName(user.getRealName())
                 .email(user.getEmail())
                 .phone(user.getPhone())

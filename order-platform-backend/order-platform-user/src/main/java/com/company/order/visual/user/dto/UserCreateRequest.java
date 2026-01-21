@@ -1,8 +1,11 @@
 package com.company.order.visual.user.dto;
 
 import jakarta.validation.constraints.*; // 参数校验
+import lombok.Data;
+
 import java.util.List;
 // 更新请求
+@Data
 public class UserCreateRequest {
     @NotBlank
     @Size(min = 3, max = 20, message = "用户名长度3-20位")

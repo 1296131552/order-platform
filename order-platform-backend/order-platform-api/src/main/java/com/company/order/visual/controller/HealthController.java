@@ -27,4 +27,5 @@ public class HealthController {
         data.put("time", LocalDateTime.now());
         return Result.ok(data);
     }
+
 }

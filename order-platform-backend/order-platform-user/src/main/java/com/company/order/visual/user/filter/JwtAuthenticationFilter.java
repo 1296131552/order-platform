@@ -1,5 +1,6 @@
 package com.company.order.visual.user.filter;
 
+import com.company.order.visual.common.handler.MetaObjectHandlerImpl;
 import com.company.order.visual.common.security.JwtService;
 import com.company.order.visual.common.security.TokenBlacklistService;
 import com.company.order.visual.common.security.TokenInfo;
@@ -99,13 +100,22 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
             SecurityContextHolder.getContext().setAuthentication(authToken);
 
+            // 设置操作人 ID 到 ThreadLocal（供 MyBatis-Plus 自动填充使用）
+            MetaObjectHandlerImpl.setOperatorId(tokenInfo.getUserId());
+
             log.debug("用户认证成功，userId={}", tokenInfo.getUserId());
+
+            // 继续过滤器链（ThreadLocal 在整个请求周期内有效）
+            filterChain.doFilter(request, response);
 
         } catch (Exception e) {
             log.error("认证过程异常", e);
-        } 
-        
-        filterChain.doFilter(request, response);
-        
+            // 异常时也要继续过滤器链，让后续处理器决定如何响应
+            filterChain.doFilter(request, response);
+        } finally {
+            // 请求处理完成后清理 ThreadLocal，防止内存泄漏
+            MetaObjectHandlerImpl.clearOperatorId();
+        }
+
     }
 }

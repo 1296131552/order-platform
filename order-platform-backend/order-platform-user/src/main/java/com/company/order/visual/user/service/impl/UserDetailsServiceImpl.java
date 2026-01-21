@@ -13,8 +13,13 @@ import org.springframework.stereotype.Service;
  * Spring Security UserDetailsService 实现
  * <p>
  * 职责：
- * - 根据 username（实际是 userId）加载用户详情
+ * - 根据 userId 加载用户详情
  * - 供 JWT 认证过滤器使用
+ * <p>
+ * 设计说明（Framework Hack）：
+ * Spring Security 的 UserDetailsService 接口方法名为 loadUserByUsername，
+ * 但我们的系统使用 userId 作为认证主体（Token 的 subject 存储的是 userId）。
+ * 这是一个框架接口与业务设计的妥协，username 参数实际存储的是 userId。
  */
 @Service
 @RequiredArgsConstructor
@@ -24,7 +29,7 @@ public class UserDetailsServiceImpl implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        // username 实际存储的是 userId
+        // Framework Hack: username 参数实际是 userId（Token subject）
         Long userId = Long.parseLong(username);
         return loadUserById(userId);
     }
