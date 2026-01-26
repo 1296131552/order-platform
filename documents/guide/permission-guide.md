@@ -249,7 +249,7 @@ INSERT INTO t_permission (permission_code, permission_name, parent_id, permissio
 ### 2.3 Permission 实体
 
 ```java
-package com.company.order.visual.user.entity;
+package com.company.user.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -263,7 +263,7 @@ import java.time.LocalDateTime;
  * 系统权限表，定义权限点（菜单、按钮、API等）
  * 关系: Permission N:M Role (通过 t_role_permission 中间表关联)
  *
- * @author Order Platform Team
+
  */
 @Data
 @TableName("t_permission")
@@ -397,7 +397,7 @@ COMMENT='角色菜单关联表';
 ### 3.2 Menu 实体
 
 ```java
-package com.company.order.visual.user.entity;
+package com.company.user.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -413,7 +413,7 @@ import java.util.TreeSet;
  * 系统菜单表，定义前端菜单结构
  * 关系: Menu N:M Role (通过 t_role_menu 中间表关联)
  *
- * @author Order Platform Team
+
  */
 @Data
 @TableName("t_menu")
@@ -531,7 +531,7 @@ public class Menu {
 ### 4.1 自定义注解
 
 ```java
-package com.company.order.visual.common.annotation;
+package com.company.common.annotation;
 
 import java.lang.annotation.*;
 
@@ -540,7 +540,7 @@ import java.lang.annotation.*;
  * <p>
  * 用于标记需要权限校验的接口，只有拥有指定权限的用户才能访问
  *
- * @author Order Platform Team
+
  */
 @Target({ElementType.METHOD, ElementType.TYPE})
 @Retention(RetentionPolicy.RUNTIME)
@@ -573,11 +573,11 @@ public @interface RequirePermission {
 ### 4.2 权限校验 AOP 切面
 
 ```java
-package com.company.order.visual.common.aspect;
+package com.company.common.aspect;
 
-import com.company.order.visual.common.annotation.RequirePermission;
-import com.company.order.visual.common.exception.ForbiddenException;
-import com.company.order.visual.common.holder.UserHolder;
+import com.company.common.annotation.RequirePermission;
+import com.company.common.exception.ForbiddenException;
+import com.company.common.holder.UserHolder;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.annotation.Aspect;
@@ -594,7 +594,7 @@ import java.util.Set;
  * <p>
  * 拦截带有 @RequirePermission 注解的方法，校验用户权限
  *
- * @author Order Platform Team
+
  */
 @Aspect
 @Component
@@ -703,14 +703,14 @@ public class OrderController {
 ### 5.1 数据权限枚举
 
 ```java
-package com.company.order.visual.user.enums;
+package com.company.user.enums;
 
 import lombok.Getter;
 
 /**
  * 数据权限类型枚举
  *
- * @author Order Platform Team
+
  */
 @Getter
 public enum DataScopeType {
@@ -743,12 +743,12 @@ public enum DataScopeType {
 ### 5.2 数据权限拦截器
 
 ```java
-package com.company.order.visual.common.interceptor;
+package com.company.common.interceptor;
 
 import com.baomidou.mybatisplus.extension.plugins.inner.InnerInterceptor;
-import com.company.order.visual.common.holder.UserHolder;
-import com.company.order.visual.user.entity.CurrentUser;
-import com.company.order.visual.user.enums.DataScopeType;
+import com.company.common.holder.UserHolder;
+import com.company.user.entity.CurrentUser;
+import com.company.user.enums.DataScopeType;
 import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.expression.StringValue;
 import net.sf.jsqlparser.expression.operators.conditional.AndExpression;
@@ -770,7 +770,7 @@ import java.util.List;
  * <p>
  * 基于 MyBatis-Plus 拦截器，自动在 SQL 中添加数据权限条件
  *
- * @author Order Platform Team
+
  */
 @Component
 public class DataScopeInterceptor implements InnerInterceptor {
@@ -874,13 +874,13 @@ public class DataScopeInterceptor implements InnerInterceptor {
 ### 6.1 PermissionService
 
 ```java
-package com.company.order.visual.user.service;
+package com.company.user.service;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.company.order.visual.user.dto.PermissionAssignRequest;
-import com.company.order.visual.user.entity.Permission;
-import com.company.order.visual.user.entity.Role;
-import com.company.order.visual.user.vo.PermissionVO;
+import com.company.user.dto.PermissionAssignRequest;
+import com.company.user.entity.Permission;
+import com.company.user.entity.Role;
+import com.company.user.vo.PermissionVO;
 
 import java.util.List;
 import java.util.Set;
@@ -910,10 +910,10 @@ public interface PermissionService {
 ### 6.2 MenuService
 
 ```java
-package com.company.order.visual.user.service;
+package com.company.user.service;
 
-import com.company.order.visual.user.entity.Menu;
-import com.company.order.visual.user.vo.MenuVO;
+import com.company.user.entity.Menu;
+import com.company.user.vo.MenuVO;
 
 import java.util.List;
 
@@ -943,10 +943,10 @@ public interface MenuService {
 ### 6.3 菜单树构建工具
 
 ```java
-package com.company.order.visual.user.util;
+package com.company.user.util;
 
-import com.company.order.visual.user.entity.Menu;
-import com.company.order.visual.user.vo.MenuVO;
+import com.company.user.entity.Menu;
+import com.company.user.vo.MenuVO;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -956,7 +956,7 @@ import java.util.Map;
 /**
  * 菜单树构建工具
  *
- * @author Order Platform Team
+
  */
 public class MenuTreeBuilder {
 

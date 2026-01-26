@@ -1,10 +1,10 @@
-package com.company.order.visual.user.util;
+package com.company.user.util;
 
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 /**
  * 密码生成工具
- * <p> mvn test-compile exec:java -Dexec.mainClass="com.company.order.visual.user.util.PasswordGenerator"
+ * <p> mvn test-compile exec:java -Dexec.mainClass="com.company.user.util.PasswordGenerator"
  * 用于生成 BCrypt 加密后的密码，方便插入测试数据
  */
 public class PasswordGenerator {

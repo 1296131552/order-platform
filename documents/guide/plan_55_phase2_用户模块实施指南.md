@@ -108,10 +108,10 @@ TOKEN_INVALID(4005, "Token无效或已过期"),
 ### 4.1 UserMapper.java
 
 ```java
-package com.company.order.visual.user.mapper;
+package com.company.user.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.company.order.visual.user.entity.User;
+import com.company.user.entity.User;
 import org.apache.ibatis.annotations.Mapper;
 
 @Mapper
@@ -123,10 +123,10 @@ public interface UserMapper extends BaseMapper<User> {
 ### 4.2 RoleMapper.java
 
 ```java
-package com.company.order.visual.user.mapper;
+package com.company.user.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.company.order.visual.user.entity.Role;
+import com.company.user.entity.Role;
 import org.apache.ibatis.annotations.Mapper;
 
 @Mapper
@@ -137,11 +137,11 @@ public interface RoleMapper extends BaseMapper<Role> {
 ### 4.3 UserRoleMapper.java
 
 ```java
-package com.company.order.visual.user.mapper;
+package com.company.user.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.company.order.visual.user.dto.UserVO.RoleInfo;
-import com.company.order.visual.user.entity.UserRole;
+import com.company.user.dto.UserVO.RoleInfo;
+import com.company.user.entity.UserRole;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Select;
 
@@ -171,7 +171,7 @@ public interface UserRoleMapper extends BaseMapper<UserRole> {
 ### 5.1 LoginRequest.java
 
 ```java
-package com.company.order.visual.user.dto;
+package com.company.user.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
@@ -189,7 +189,7 @@ public class LoginRequest {
 ### 5.2 UserCreateRequest.java
 
 ```java
-package com.company.order.visual.user.dto;
+package com.company.user.dto;
 
 import jakarta.validation.constraints.*;
 import lombok.Data;
@@ -229,7 +229,7 @@ public class UserCreateRequest {
 ### 5.3 UserUpdateRequest.java
 
 ```java
-package com.company.order.visual.user.dto;
+package com.company.user.dto;
 
 import jakarta.validation.constraints.*;
 import lombok.Data;
@@ -264,7 +264,7 @@ public class UserUpdateRequest {
 ### 5.4 LoginResponse.java（简化版）
 
 ```java
-package com.company.order.visual.user.dto;
+package com.company.user.dto;
 
 import lombok.*;
 
@@ -292,7 +292,7 @@ public class LoginResponse {
 ### 5.5 UserVO.java
 
 ```java
-package com.company.order.visual.user.dto;
+package com.company.user.dto;
 
 import lombok.*;
 import java.time.LocalDateTime;
@@ -340,7 +340,7 @@ public class UserVO {
 ### 5.6 UserQueryRequest.java
 
 ```java
-package com.company.order.visual.user.dto;
+package com.company.user.dto;
 
 import lombok.Data;
 
@@ -364,10 +364,10 @@ public class UserQueryRequest {
 ### 6.1 UserService.java 接口
 
 ```java
-package com.company.order.visual.user.service;
+package com.company.user.service;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.company.order.visual.user.dto.*;
+import com.company.user.dto.*;
 
 public interface UserService {
     /**
@@ -409,18 +409,18 @@ public interface UserService {
 ### 6.2 UserServiceImpl.java 实现（核心登录逻辑）
 
 ```java
-package com.company.order.visual.user.service.impl;
+package com.company.user.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.company.order.visual.common.exception.BusinessException;
-import com.company.order.visual.common.response.ResponseCode;
-import com.company.order.visual.user.dto.*;
-import com.company.order.visual.user.entity.User;
-import com.company.order.visual.user.entity.UserRole;
-import com.company.order.visual.user.mapper.UserMapper;
-import com.company.order.visual.user.mapper.UserRoleMapper;
-import com.company.order.visual.user.service.UserService;
+import com.company.common.exception.BusinessException;
+import com.company.common.response.ResponseCode;
+import com.company.user.dto.*;
+import com.company.user.entity.User;
+import com.company.user.entity.UserRole;
+import com.company.user.mapper.UserMapper;
+import com.company.user.mapper.UserRoleMapper;
+import com.company.user.service.UserService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -754,12 +754,12 @@ public class UserServiceImpl implements UserService {
 ### 7.1 UserController.java
 
 ```java
-package com.company.order.visual.user.controller;
+package com.company.user.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.company.order.visual.common.response.Result;
-import com.company.order.visual.user.dto.*;
-import com.company.order.visual.user.service.UserService;
+import com.company.common.response.Result;
+import com.company.user.dto.*;
+import com.company.user.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;

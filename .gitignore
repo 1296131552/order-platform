@@ -75,3 +75,17 @@ coverage/
 documents/常用/
 documents/zh/
 documents/do/
+
+# github
+github/
+
+plan/
+.claude/
+.vscode/
+documents/
+github/
+memory-back/
+order-platform-frontend/
+plan/
+
+

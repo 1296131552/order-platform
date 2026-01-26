@@ -54,7 +54,7 @@ order-platform-{module}/
 ## 三、Entity 实体模板
 
 ```java
-package com.company.order.visual.{module}.entity;
+package com.company.{module}.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
@@ -113,10 +113,10 @@ public class {Entity} {
 ## 四、Mapper 模板
 
 ```java
-package com.company.order.visual.{module}.mapper;
+package com.company.{module}.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.company.order.visual.{module}.entity.{Entity};
+import com.company.{module}.entity.{Entity};
 import org.apache.ibatis.annotations.Mapper;
 
 /**
@@ -141,7 +141,7 @@ public interface {Entity}Mapper extends BaseMapper<{Entity}> {
 ### 5.1 创建请求 DTO
 
 ```java
-package com.company.order.visual.{module}.dto;
+package com.company.{module}.dto;
 
 import jakarta.validation.constraints.*;
 import lombok.Data;
@@ -167,7 +167,7 @@ public class {Entity}CreateRequest {
 ### 5.2 更新请求 DTO
 
 ```java
-package com.company.order.visual.{module}.dto;
+package com.company.{module}.dto;
 
 import jakarta.validation.constraints.*;
 import lombok.Data;
@@ -190,7 +190,7 @@ public class {Entity}UpdateRequest {
 ### 5.3 查询请求 DTO
 
 ```java
-package com.company.order.visual.{module}.dto;
+package com.company.{module}.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -232,7 +232,7 @@ public class {Entity}QueryRequest {
 ### 5.4 响应 VO
 
 ```java
-package com.company.order.visual.{module}.dto;
+package com.company.{module}.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
@@ -267,10 +267,10 @@ public class {Entity}VO {
 ## 六、Converter 转换器模板
 
 ```java
-package com.company.order.visual.{module}.converter;
+package com.company.{module}.converter;
 
-import com.company.order.visual.{module}.dto.{Entity}VO;
-import com.company.order.visual.{module}.entity.{Entity};
+import com.company.{module}.dto.{Entity}VO;
+import com.company.{module}.entity.{Entity};
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -317,10 +317,10 @@ public class {Entity}Converter {
 ### 7.1 Service 接口
 
 ```java
-package com.company.order.visual.{module}.service;
+package com.company.{module}.service;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.company.order.visual.{module}.dto.*;
+import com.company.{module}.dto.*;
 
 /**
  * {实体}服务接口
@@ -357,17 +357,17 @@ public interface {Entity}Service {
 ### 7.2 Service 实现类
 
 ```java
-package com.company.order.visual.{module}.service.impl;
+package com.company.{module}.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.company.order.visual.common.exception.BusinessException;
-import com.company.order.visual.common.response.ResponseCode;
-import com.company.order.visual.{module}.converter.{Entity}Converter;
-import com.company.order.visual.{module}.dto.*;
-import com.company.order.visual.{module}.entity.{Entity};
-import com.company.order.visual.{module}.mapper.{Entity}Mapper;
-import com.company.order.visual.{module}.service.{Entity}Service;
+import com.company.common.exception.BusinessException;
+import com.company.common.response.ResponseCode;
+import com.company.{module}.converter.{Entity}Converter;
+import com.company.{module}.dto.*;
+import com.company.{module}.entity.{Entity};
+import com.company.{module}.mapper.{Entity}Mapper;
+import com.company.{module}.service.{Entity}Service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -518,13 +518,13 @@ public class {Entity}ServiceImpl implements {Entity}Service {
 ## 八、Controller 模板
 
 ```java
-package com.company.order.visual.{module}.controller;
+package com.company.{module}.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.company.order.visual.common.handler.MetaObjectHandlerImpl;
-import com.company.order.visual.common.response.Result;
-import com.company.order.visual.{module}.dto.*;
-import com.company.order.visual.{module}.service.{Entity}Service;
+import com.company.common.handler.MetaObjectHandlerImpl;
+import com.company.common.response.Result;
+import com.company.{module}.dto.*;
+import com.company.{module}.service.{Entity}Service;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;

@@ -224,7 +224,7 @@ public RedisCacheManager cacheManager(@NonNull RedisConnectionFactory connection
 
 ```java
 // 添加导入
-import com.company.order.visual.common.handler.MetaObjectHandlerImpl;
+import com.company.common.handler.MetaObjectHandlerImpl;
 
 // 认证成功后设置操作人 ID（第 104 行）
 if (authResult.isAuthenticated()) {
@@ -243,7 +243,7 @@ finally {
 
 ```java
 // 添加导入
-import com.company.order.visual.common.handler.MetaObjectHandlerImpl;
+import com.company.common.handler.MetaObjectHandlerImpl;
 
 // 移除导入
 // import org.springframework.security.core.context.SecurityContextHolder;

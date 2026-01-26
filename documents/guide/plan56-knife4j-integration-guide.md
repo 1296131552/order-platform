@@ -126,7 +126,7 @@ springdoc:
 **完整代码**：
 
 ```java
-package com.company.order.visual.config;
+package com.company.config;
 
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
@@ -279,9 +279,9 @@ public class OpenApiConfig {
 **更新后代码**：
 
 ```java
-package com.company.order.visual.controller;
+package com.company.controller;
 
-import com.company.order.visual.common.response.Result;
+import com.company.common.response.Result;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -298,7 +298,7 @@ import java.util.Map;
 /**
  * 健康检查控制器
  *
- * @author Order Platform Team
+
  */
 @Tag(name = "系统管理", description = "系统健康检查、监控等接口")
 @RestController

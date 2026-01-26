@@ -5,6 +5,11 @@
          https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
+    <groupId>com.company</groupId>  
+    <artifactId>order-platform</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
@@ -12,25 +17,16 @@
         <relativePath/>
     </parent>
 
-    <groupId>com.company.order.visual</groupId>
-    <artifactId>order-platform-parent</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
-    <packaging>pom</packaging>
-
     <name>Order Platform Parent</name>
     <description>订单可视化数字化管理平台 - 父项目</description>
 
     <modules>
-        <module>order-platform-api</module>
-        <module>order-platform-common</module>
-        <module>order-platform-order</module>
-        <module>order-platform-shipment</module>
-        <module>order-platform-partner</module>
-        <module>order-platform-dashboard</module>
-        <module>order-platform-attachment</module>
-        <module>order-platform-exception</module>
-        <module>order-platform-user</module>
-        <module>order-platform-visualization</module>
+        <module>system</module>
+        <!-- <module>auth</module> -->
+        <module>common</module>
+        <!-- <module>menu</module> -->
+        <module>user</module>
+        <module>app</module>
     </modules>
 
     <properties>
@@ -51,54 +47,40 @@
         <jwt.version>0.11.5</jwt.version>
         <flyway.version>9.22.3</flyway.version>
         <awaitility.version>4.2.0</awaitility.version>
+        <jspecify.version>1.0.0</jspecify.version>
+        <jakarta-annotation.version>2.1.1</jakarta-annotation.version>
     </properties>
-
     <dependencyManagement>
         <dependencies>
             <!-- 子模块依赖 -->
             <dependency>
-                <groupId>com.company.order.visual</groupId>
-                <artifactId>order-platform-common</artifactId>
+                <groupId>com.company</groupId>
+                <artifactId>system</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <!-- <dependency>
+                <groupId>com.company</groupId>
+                <artifactId>auth</artifactId>
+                <version>${project.version}</version>
+            </dependency> -->
+            <dependency>
+                <groupId>com.company</groupId>
+                <artifactId>common</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <!-- <dependency>
+                <groupId>com.company</groupId>
+                <artifactId>menu</artifactId>
+                <version>${project.version}</version>
+            </dependency> -->
+            <dependency>
+                <groupId>com.company</groupId>
+                <artifactId>user</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>com.company.order.visual</groupId>
-                <artifactId>order-platform-order</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.company.order.visual</groupId>
-                <artifactId>order-platform-shipment</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.company.order.visual</groupId>
-                <artifactId>order-platform-partner</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.company.order.visual</groupId>
-                <artifactId>order-platform-user</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.company.order.visual</groupId>
-                <artifactId>order-platform-dashboard</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.company.order.visual</groupId>
-                <artifactId>order-platform-attachment</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.company.order.visual</groupId>
-                <artifactId>order-platform-exception</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.company.order.visual</groupId>
-                <artifactId>order-platform-visualization</artifactId>
+                <groupId>com.company</groupId>
+                <artifactId>app</artifactId>
                 <version>${project.version}</version>
             </dependency>
 
@@ -197,6 +179,20 @@
                 <artifactId>awaitility</artifactId>
                 <version>${awaitility.version}</version>
                 <scope>test</scope>
+            </dependency>
+
+            <!-- JSpecify Nullability Annotations -->
+            <dependency>
+                <groupId>org.jspecify</groupId>
+                <artifactId>jspecify</artifactId>
+                <version>${jspecify.version}</version>
+            </dependency>
+
+            <!-- Jakarta Annotation API -->
+            <dependency>
+                <groupId>jakarta.annotation</groupId>
+                <artifactId>jakarta.annotation-api</artifactId>
+                <version>${jakarta-annotation.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

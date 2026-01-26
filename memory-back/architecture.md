@@ -154,7 +154,7 @@ auth:active:{userId}      →  SET (活跃tokenId列表，TTL=7天)
 #### 目录结构
 
 ```
-com.company.order.visual.user/
+com.company.user/
 ├── controller/       # API 控制层
 ├── service/          # 业务服务层
 │   └── impl/         # 服务实现

@@ -222,7 +222,7 @@ auth:
 **文件位置**：`order-platform-common/src/main/java/.../security/JwtProperties.java`
 
 ```java
-package com.company.order.visual.common.security;
+package com.company.common.security;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -274,7 +274,7 @@ public class JwtProperties {
 **文件位置**：`order-platform-common/src/main/java/.../security/JwtProvider.java`
 
 ```java
-package com.company.order.visual.common.security;
+package com.company.common.security;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
@@ -509,7 +509,7 @@ public class JwtProvider {
 **文件位置**：`order-platform-common/src/main/java/.../security/UserHolder.java`
 
 ```java
-package com.company.order.visual.common.security;
+package com.company.common.security;
 
 import lombok.Data;
 
@@ -553,7 +553,7 @@ public class UserContext {
 **文件位置**：`order-platform-common/src/main/java/.../security/UserHolder.java`
 
 ```java
-package com.company.order.visual.common.security;
+package com.company.common.security;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.NamedThreadLocal;
@@ -661,7 +661,7 @@ public class UserHolder {
 **文件位置**：`order-platform-common/src/main/java/.../security/TokenVersionService.java`
 
 ```java
-package com.company.order.visual.common.security;
+package com.company.common.security;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -832,7 +832,7 @@ auth:blacklist:{tokenId}  = "1" (String)              (TTL: token 剩余有效�
 **文件位置**：`order-platform-common/src/main/java/.../security/JwtAuthenticationFilter.java`
 
 ```java
-package com.company.order.visual.common.security;
+package com.company.common.security;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -1022,7 +1022,7 @@ public class AuthWhitelistProperties {
 **文件位置**：`order-platform-api/src/main/java/.../config/WebConfig.java`
 
 ```java
-package com.company.order.visual.api.config;
+package com.company.api.config;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
@@ -1042,9 +1042,9 @@ public class WebConfig implements WebMvcConfigurer {
 **文件位置**：`order-platform-api/src/main/java/.../config/FilterConfig.java`
 
 ```java
-package com.company.order.visual.api.config;
+package com.company.api.config;
 
-import com.company.order.visual.common.security.JwtAuthenticationFilter;
+import com.company.common.security.JwtAuthenticationFilter;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -1077,19 +1077,19 @@ public class FilterConfig {
 **文件位置**：`order-platform-user/src/main/java/.../service/impl/AuthServiceImpl.java`
 
 ```java
-package com.company.order.visual.user.service.impl;
+package com.company.user.service.impl;
 
-import com.company.order.visual.common.response.ResponseCode;
-import com.company.order.visual.common.response.Result;
-import com.company.order.visual.common.security.JwtProvider;
-import com.company.order.visual.common.security.TokenVersionService;
-import com.company.order.visual.user.converter.UserConverter;
-import com.company.order.visual.user.dto.LoginRequest;
-import com.company.order.visual.user.dto.LoginResponse;
-import com.company.order.visual.user.dto.UserVO;
-import com.company.order.visual.user.entity.User;
-import com.company.order.visual.user.mapper.UserMapper;
-import com.company.order.visual.user.service.AuthService;
+import com.company.common.response.ResponseCode;
+import com.company.common.response.Result;
+import com.company.common.security.JwtProvider;
+import com.company.common.security.TokenVersionService;
+import com.company.user.converter.UserConverter;
+import com.company.user.dto.LoginRequest;
+import com.company.user.dto.LoginResponse;
+import com.company.user.dto.UserVO;
+import com.company.user.entity.User;
+import com.company.user.mapper.UserMapper;
+import com.company.user.service.AuthService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -1184,12 +1184,12 @@ public class AuthServiceImpl implements AuthService {
 **文件位置**：`order-platform-user/src/main/java/.../controller/AuthController.java`
 
 ```java
-package com.company.order.visual.user.controller;
+package com.company.user.controller;
 
-import com.company.order.visual.common.response.Result;
-import com.company.order.visual.user.dto.LoginRequest;
-import com.company.order.visual.user.dto.LoginResponse;
-import com.company.order.visual.user.service.AuthService;
+import com.company.common.response.Result;
+import com.company.user.dto.LoginRequest;
+import com.company.user.dto.LoginResponse;
+import com.company.user.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
@@ -1239,11 +1239,11 @@ public class AuthController {
 **文件位置**：`order-platform-user/src/main/java/.../service/AuthService.java`
 
 ```java
-package com.company.order.visual.user.service;
+package com.company.user.service;
 
-import com.company.order.visual.common.response.Result;
-import com.company.order.visual.user.dto.LoginRequest;
-import com.company.order.visual.user.dto.LoginResponse;
+import com.company.common.response.Result;
+import com.company.user.dto.LoginRequest;
+import com.company.user.dto.LoginResponse;
 
 /**
  * 认证服务接口
