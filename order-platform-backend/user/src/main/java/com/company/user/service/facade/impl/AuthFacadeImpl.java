@@ -15,12 +15,15 @@ import com.company.user.service.domain.user.UserOperationDomain;
 import com.company.user.service.domain.user.UserQueryDomain;
 import com.company.user.service.facade.AuthFacade;
 import jakarta.annotation.Resource;
+
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 public class AuthFacadeImpl implements AuthFacade {
     @Resource
@@ -39,6 +42,9 @@ public class AuthFacadeImpl implements AuthFacade {
     @Resource
     private SettingApi settingApi;
 
+    @Resource
+    private AuthConverter authConverter;
+
     /**
      * 用户登录
      * @param loginDTO 登录DTO
@@ -48,6 +54,8 @@ public class AuthFacadeImpl implements AuthFacade {
     public JwtVO login(LoginDTO loginDTO) {
         String username = loginDTO.getUsername();
         String password = loginDTO.getPassword();
+
+        // log.info("登录请求: username={}, password={}", username, password);
 
         // 认证
         Authentication authentication = authenticationManager.authenticate(
@@ -84,11 +92,11 @@ public class AuthFacadeImpl implements AuthFacade {
         }
 
         // 注册用户
-        AddUserDTO addUserDTO = AuthConverter.INSTANCE.toAddUserDTO(dto, settingApi.getDefaultRoles());
+        AddUserDTO addUserDTO = authConverter.toAddUserDTO(dto, settingApi.getDefaultRoles());
         Integer id = userOperationDomain.addUser(addUserDTO);
 
         // 登录注册用户
-        return login(AuthConverter.INSTANCE.toLoginDTO(dto));
+        return login(authConverter.toLoginDTO(dto));
     }
 
     /**

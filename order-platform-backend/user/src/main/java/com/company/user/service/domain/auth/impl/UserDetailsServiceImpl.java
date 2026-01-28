@@ -14,7 +14,9 @@ import com.company.user.service.basic.UserRoleService;
 import com.company.user.service.basic.UserService;
 
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 public class UserDetailsServiceImpl implements UserDetailsService {
 
@@ -34,11 +36,15 @@ public class UserDetailsServiceImpl implements UserDetailsService {
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         // 查询用户
+        log.info("尝试登录用户: {}", username);
         User user = userService.getUser(username);
 
         if (user == null) {
+            log.warn("用户不存在: {}", username);
             throw new UsernameNotFoundException(AuthResultCode.USERNAME_NOT_EXISTS.getMessage());
         }
+
+        log.info("查询到用户: {}, 密码hash: {}", user.getUsername(), user.getPassword());
 
         // 获取当前角色的权限
         List<Integer> roleIds = userRoleService.getRoleIds(user.getId());
@@ -46,10 +52,12 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         // 获取用户权限码列表 
         // List<String> permissionCodes = permissionBkQueryDomain.getPermissionCode(roleIds);
 
-        // 转换为Spring Security的Authority 
+        // 转换为Spring Security的Authority
+        // TODO: 实现权限查询后启用
         // List<SimpleGrantedAuthority> authorities = permissionCodes.stream()
         //         .map(SimpleGrantedAuthority::new)
         //         .toList();
+        List<SimpleGrantedAuthority> authorities = List.of();
 
         // 返回UserDetails对象
         return new org.springframework.security.core.userdetails.User(
@@ -59,7 +67,7 @@ public class UserDetailsServiceImpl implements UserDetailsService {
                 true,   // accountNonExpired - 账户是否未过期
                 true,   // credentialsNonExpired - 凭证是否未过期
                 true,  // accountNonLocked - 账户是否未被锁定
-                null
+                authorities
         );
     }
 }

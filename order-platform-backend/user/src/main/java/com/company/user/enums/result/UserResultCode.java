@@ -1,6 +1,7 @@
-package com.company.common.enums.result;
+package com.company.user.enums.result;
 
 import com.company.common.enums.IResult;
+import com.company.common.enums.result.GlobalResultCode;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

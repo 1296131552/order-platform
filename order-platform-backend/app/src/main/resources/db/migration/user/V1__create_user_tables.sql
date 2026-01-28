@@ -56,7 +56,7 @@ INSERT INTO `t_role` (`name`, `description`, `parent_node_id`, `level`) VALUES
 ('超级管理员', '拥有所有权限', 0, 0),
 ('普通用户', '普通用户角色', 0, 0);
 
--- 插入默认管理员用户 (用户名: admin, 密码: admin123, BCrypt加密后)
+-- 插入默认管理员用户 (用户名: admin, 密码: Ww123456789, BCrypt加密后)
 INSERT INTO `user` (`username`, `password`, `is_valid`) VALUES
 ('admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', 1);
 

@@ -6,9 +6,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.company.common.enums.result.UserResultCode;
 import com.company.common.exception.BusinessException;
 import com.company.user.converter.UserConverter;
+import com.company.user.enums.result.UserResultCode;
 import com.company.user.model.dto.AddUserDTO;
 import com.company.user.model.dto.ModifyUserDTO;
 import com.company.user.model.dto.UpdateUserDTO;
@@ -33,6 +33,8 @@ public class UserOperationDomainImpl implements UserOperationDomain{
     private UserRoleService userRoleService;
     @Resource
     private PasswordEncoder passwordEncoder;
+    @Resource
+    private UserConverter userConverter;
     /**
      * 创建用户
      * @param addUserDTO 用户信息
@@ -45,7 +47,7 @@ public class UserOperationDomainImpl implements UserOperationDomain{
         Integer userId = userService.createUser(addUserDTO.getUsername(), encodedPassword);
 
         // 绑定用户详情
-        UserDetail userDetail = UserConverter.INSTANCE.addUserDTOToDetail(addUserDTO);
+        UserDetail userDetail = userConverter.addUserDTOToDetail(addUserDTO);
         userDetailService.createDetail(userId, userDetail);
 
         // 关联用户角色
@@ -66,7 +68,7 @@ public class UserOperationDomainImpl implements UserOperationDomain{
         }
 
         // 转换为Detail对象
-        UserDetail userDetail = UserConverter.INSTANCE.modifyUserDTOToDetail(modifyUserDTO);
+        UserDetail userDetail = userConverter.modifyUserDTOToDetail(modifyUserDTO);
 
         // 更新Detail信息
         userDetailService.updateById(userDetail);
@@ -82,7 +84,7 @@ public class UserOperationDomainImpl implements UserOperationDomain{
     @Override
     public void updateUser(UpdateUserDTO updateUserDTO) {
         // 转换为Detail对象
-        UserDetail userDetail = UserConverter.INSTANCE.updateUserDTOToDetail(updateUserDTO);
+        UserDetail userDetail = userConverter.updateUserDTOToDetail(updateUserDTO);
 
         // 更新Detail信息
         userDetailService.updateById(userDetail);

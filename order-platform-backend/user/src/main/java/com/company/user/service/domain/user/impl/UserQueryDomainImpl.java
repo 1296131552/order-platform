@@ -9,10 +9,10 @@ import org.springframework.stereotype.Service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.CollectionUtils;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.company.common.enums.result.UserResultCode;
 import com.company.common.exception.BusinessException;
 import com.company.common.model.dto.PageQueryDTO;
 import com.company.user.converter.UserConverter;
+import com.company.user.enums.result.UserResultCode;
 import com.company.user.mapper.UserMapper;
 import com.company.user.model.dto.GetUsersDTO;
 import com.company.user.model.entity.Role;
@@ -38,6 +38,8 @@ public class UserQueryDomainImpl implements UserQueryDomain{
     private UserRoleService userRoleService;
     @Resource
     private UserOnlineService userOnlineService;
+    @Resource
+    private UserConverter userConverter;
 
     /**
      * 获取用户
@@ -55,7 +57,7 @@ public class UserQueryDomainImpl implements UserQueryDomain{
         // 获取用户角色
         List<Role> roles = userRoleService.getRolesByUserId(user.getId());
 
-        return UserConverter.INSTANCE.toUserVO(user, userDetail, roles);
+        return userConverter.toUserVO(user, userDetail, roles);
     }
 
     /**
@@ -79,7 +81,7 @@ public class UserQueryDomainImpl implements UserQueryDomain{
         // 获取用户角色
         List<Role> roles = userRoleService.getRolesByUserId(user.getId());
 
-        return UserConverter.INSTANCE.toUserVO(user, userDetail, roles);
+        return userConverter.toUserVO(user, userDetail, roles);
     }
 
     /**
@@ -120,7 +122,7 @@ public class UserQueryDomainImpl implements UserQueryDomain{
 
         List<User> users = userService.listByIds(userIds);
         List<UserDetail> userDetails = userDetailService.listByIds(userIds);
-        return UserConverter.INSTANCE.toUserVOS(users, userDetails);
+        return userConverter.toUserVOS(users, userDetails);
     }
 
     /**

@@ -1,13 +1,14 @@
 package com.company.user.service.domain.user.impl;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
 
 import com.company.user.model.entity.User;
 import com.company.user.service.basic.UserService;
 import com.company.user.service.domain.user.UserValidationDomain;
 
 import jakarta.annotation.Resource;
-
+@Service
 public class UserValidationDomainImpl implements UserValidationDomain {
     @Resource
     private UserService userService;

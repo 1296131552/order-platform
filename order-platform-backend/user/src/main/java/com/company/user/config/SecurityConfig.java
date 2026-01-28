@@ -64,7 +64,7 @@ public class SecurityConfig {
                 }
                 
                 // 添加固定的文档访问路径
-                auth.requestMatchers("/swagger-ui/**", "/v3/api-docs/**", apiDocsPath, swaggerUiPath).permitAll()
+                auth.requestMatchers("/swagger-ui/**", "/v3/api-docs/**","/doc.html","/webjars/**","/favicon.ico","/error",apiDocsPath, swaggerUiPath).permitAll()
                     .anyRequest().authenticated(); // 其他请求需要认证
             })
             .sessionManagement(session -> session
@@ -75,6 +75,8 @@ public class SecurityConfig {
             .exceptionHandling(exceptions -> exceptions
                 .authenticationEntryPoint((request, response, authException) -> {
                     // 认证失败（未登录或token无效）- 这是正常的业务流程，不是异常
+                    log.debug("认证失败: URI={}, Method={}, Exception={}",
+                            request.getRequestURI(), request.getMethod(), authException.getMessage());
                     handleAuthResponse(response, GlobalResultCode.UNAUTHORIZED);
                 })
                 .accessDeniedHandler((request, response, accessDeniedException) -> {

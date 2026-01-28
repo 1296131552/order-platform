@@ -9,6 +9,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mapstruct.factory.Mappers;
 
 import com.company.user.model.dto.AddUserDTO;
 import com.company.user.model.dto.LoginDTO;
@@ -25,7 +26,7 @@ class AuthConverterTest {
     @BeforeEach
     void setUp() {
         // 使用 Mappers.getMapper 获取实例
-        authConverter = AuthConverter.INSTANCE;
+        authConverter = Mappers.getMapper(AuthConverter.class);
     }
 
     @Nested

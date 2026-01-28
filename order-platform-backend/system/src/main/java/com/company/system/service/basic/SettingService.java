@@ -5,9 +5,8 @@ import java.util.List;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.company.system.enums.model.SettingField;
 import com.company.system.model.dto.SettingDTO;
+import com.company.system.model.entity.Setting;
 import com.company.system.model.vo.SettingVO;
-
-import cn.hutool.setting.Setting;
 
 public interface SettingService extends IService<Setting> {
      /**

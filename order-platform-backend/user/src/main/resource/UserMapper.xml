@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.thirty.user.mapper.UserMapper">
+
+    <resultMap id="UserVOResultMap" type="com.thirty.user.model.vo.UserVO">
+        <id property="id" column="id"/>
+        <result property="username" column="username"/>
+        <result property="name" column="name"/>
+        <result property="avatarUrl" column="avatarUrl"/>
+        <result property="sex" column="sex"/>
+        <result property="signature" column="signature"/>
+        <result property="createTime" column="createTime"/>
+        <result property="updateTime" column="updateTime"/>
+        <collection property="roles" ofType="com.thirty.user.model.entity.Role" select="getUserRoles" column="id"/>
+    </resultMap>
+
+    <!-- 嵌套查询：根据用户ID获取角色列表 -->
+    <select id="getUserRoles" resultType="com.thirty.user.model.entity.Role">
+        SELECT
+            r.*
+        FROM user_role ur
+        INNER JOIN role r ON ur.role_id = r.id AND ur.is_delete = 0 AND r.is_delete = 0
+        WHERE ur.user_id = #{id}
+    </select>
+
+    <!-- 主查询：获取用户基本信息 -->
+    <select id="getUsers" resultMap="UserVOResultMap">
+        SELECT DISTINCT
+            u.id,
+            u.username,
+            d.name,
+            d.avatar_url AS avatarUrl,
+            d.sex,
+            u.is_valid AS isValid,
+            d.create_time AS createTime,
+            d.update_time AS updateTime
+        FROM user u
+        LEFT JOIN user_detail d ON u.id = d.id
+        <if test="params.roleIds != null and params.roleIds.size() > 0">
+        INNER JOIN user_role ur ON u.id = ur.user_id
+        </if>
+        <where>
+            <if test="(params.username != null and params.username != '') or (params.name != null and params.name != '')">
+                AND (
+                    <trim suffixOverrides="OR">
+                        <if test="params.username != null and params.username != ''">
+                            u.username LIKE CONCAT('%', #{params.username}, '%') OR
+                        </if>
+                        <if test="params.name != null and params.name != ''">
+                            d.name LIKE CONCAT('%', #{params.name}, '%') OR
+                        </if>
+                    </trim>
+                )
+            </if>
+            <if test="params.sex != null">
+                AND d.sex = #{params.sex}
+            </if>
+            <if test="params.roleIds != null and params.roleIds.size() > 0">
+                AND ur.role_id IN
+                <foreach collection="params.roleIds" item="roleId" open="(" close=")" separator=",">
+                    #{roleId}
+                </foreach>
+            </if>
+            <if test="params.isValid != null">
+                AND u.is_valid = #{params.isValid}
+            </if>
+            <include refid="com.thirty.common.mapper.TimeMapper.timeFilterWrapper">
+                <property name="createTimeColumn" value="d.create_time"/>
+                <property name="updateTimeColumn" value="d.update_time"/>
+            </include>
+        </where>
+        <include refid="com.thirty.common.mapper.TimeMapper.orderBy">
+            <property name="createTimeColumn" value="d.create_time"/>
+            <property name="updateTimeColumn" value="d.update_time"/>
+            <property name="defaultColumn" value="u.id"/>
+            <property name="defaultDirection" value="ASC"/>
+        </include>
+    </select>
+</mapper>

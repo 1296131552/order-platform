@@ -16,4 +16,4 @@ INSERT INTO `setting` (`field`, `title`, `description`, `value`) VALUES
 ('site_name', '站点名称', '网站的名称', '订单管理平台'),
 ('site_logo', '站点LOGO', '网站的LOGO URL', ''),
 ('register_enabled', '允许注册', '是否允许新用户注册', 'true'),
-('max_upload_size', '最大上传大小', '单个文件最大上传大小(MB)', '10');
+('max_upload_size', '最大上传大小', '单个文件最大上传大小(MB)', '100');

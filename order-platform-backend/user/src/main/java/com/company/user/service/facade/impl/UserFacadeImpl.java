@@ -5,7 +5,6 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.company.common.enums.result.UserResultCode;
 import com.company.common.exception.BusinessException;
 import com.company.common.model.dto.PageQueryDTO;
 import com.company.system.api.SettingApi;
@@ -22,6 +21,7 @@ import com.company.user.service.domain.user.UserQueryDomain;
 import com.company.user.service.domain.user.UserValidationDomain;
 import com.company.user.service.facade.UserFacade;
 import com.company.user.enums.model.RolesType;
+import com.company.user.enums.result.UserResultCode;
 
 import jakarta.annotation.Resource;
 

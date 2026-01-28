@@ -26,5 +26,6 @@ public class SecurityProperties {
         permitAllPaths.add("/auth/**");
         permitAllPaths.add("/setting/public/**");
         permitAllPaths.add("/ws/**"); // WebSocket 端点
+        permitAllPaths.add("users/**"); // 测试用 # TODO 上线需删除 
     }
 }

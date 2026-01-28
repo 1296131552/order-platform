@@ -45,6 +45,7 @@ public class JwtUtil {
 
     @PostConstruct
     public void init() {
+        // 注意: secret 必须是 Base64 编码的字符串，不包含 _ 等非法字符
         this.key = Keys.hmacShaKeyFor(Decoders.BASE64.decode(secret));
     }
 
@@ -64,7 +65,7 @@ public class JwtUtil {
     }
 
     /**
-     * 从Authorization头中提取token
+     * 从Authorization头中提取token,Bearer开头  
      */
     public String extractToken(String authHeader) {
         if (authHeader == null || !authHeader.startsWith(JwtConstant.BEARER_PREFIX)) {

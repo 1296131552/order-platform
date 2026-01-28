@@ -6,7 +6,6 @@ import java.util.Objects;
 
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
-import org.mapstruct.factory.Mappers;
 
 import com.baomidou.mybatisplus.core.toolkit.ObjectUtils;
 import com.company.user.model.dto.AddUserDTO;
@@ -22,7 +21,6 @@ import com.company.user.model.vo.UserVO;
  */
 @Mapper(componentModel = "spring")
 public interface UserConverter {
-    UserConverter INSTANCE = Mappers.getMapper(UserConverter.class);
 
     /**
      * 将AddUserDTO对象转换为Detail对象

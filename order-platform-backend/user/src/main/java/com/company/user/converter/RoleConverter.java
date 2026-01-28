@@ -13,8 +13,6 @@ import com.company.user.model.vo.RoleVO;
 
 @Mapper(componentModel = "spring")
 public interface RoleConverter {
-    RoleConverter INSTANCE = Mappers.getMapper(RoleConverter.class);
-
     /**
      * 将RoleDTO对象转换为Role对象
      */

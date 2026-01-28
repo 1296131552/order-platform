@@ -1,9 +1,5 @@
 package com.company.user.service.domain.role.builder;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-
 import com.company.common.utils.TreeBuilder;
 import com.company.user.constant.RoleConstant;
 import com.company.user.converter.RoleConverter;
@@ -12,18 +8,22 @@ import com.company.user.model.entity.Role;
 import com.company.user.model.vo.RoleVO;
 import com.company.user.service.basic.RoleService;
 import com.company.user.service.basic.UserRoleService;
-
 import lombok.AccessLevel;
 import lombok.experimental.FieldDefaults;
 
+import java.util.*;
+
 @FieldDefaults(level = AccessLevel.PRIVATE) // 所有字段默认私有
 public class RolesBuilder {
+
     final RoleService roleService;
     final UserRoleService userRoleService;
+    final RoleConverter roleConverter;
 
-    public RolesBuilder(RoleService roleService, UserRoleService userRoleService) {
+    public RolesBuilder(RoleService roleService, UserRoleService userRoleService, RoleConverter roleConverter) {
         this.roleService = roleService;
         this.userRoleService = userRoleService;
+        this.roleConverter = roleConverter;
     }
 
     /**
@@ -94,6 +94,39 @@ public class RolesBuilder {
     }
 
     /**
+     * 构建角色树
+     */
+    public List<RoleVO> buildTree() {
+        // 当前构建的角色ID列表作为基础角色列表
+        List<Role> roles = build();
+        List<RoleVO> roleVOS = roleConverter.toRoleVOS(roles);
+        return buildRoleTree(roleVOS);
+    }
+
+    /**
+     * 构建角色树（根据是否显示权限过滤角色）
+     * @param hasPermissionDisplay 是否显示权限
+     * @param permittedRoleIds 权限角色ID列表
+     * @return 角色树
+     */
+    public List<RoleVO> buildTree(boolean hasPermissionDisplay, List<Integer> permittedRoleIds) {
+        // 当前构建的角色ID列表作为基础角色列表
+        List<Role> roles = build();
+        List<RoleVO> roleVOS = roleConverter.toRoleVOS(roles);
+
+        // 过滤出角色树中有权限的角色
+        if (hasPermissionDisplay) {
+            RoleVO.filterHasPermission(permittedRoleIds, roleVOS);
+        }
+
+        // 设置角色是否有权限
+        RoleVO.setHasPermission(permittedRoleIds, roleVOS);
+
+        // 构建角色树
+        return buildRoleTree(roleVOS);
+    }
+
+    /**
      * 具体的角色树构建方法，根据角色VO列表构建角色树
      * @param roleVOS 角色VO列表
      * @return 角色树
@@ -117,15 +150,5 @@ public class RolesBuilder {
         // 全局角色添加到角色树
         roleTree.addAll(globalRoleVOS);
         return roleTree;
-    }
-
-    /**
-     * 构建角色树
-     */
-    public List<RoleVO> buildTree() {
-        // 当前构建的角色ID列表作为基础角色列表
-        List<Role> roles = build();
-        List<RoleVO> roleVOS = RoleConverter.INSTANCE.toRoleVOS(roles);
-        return buildRoleTree(roleVOS);
     }
 }

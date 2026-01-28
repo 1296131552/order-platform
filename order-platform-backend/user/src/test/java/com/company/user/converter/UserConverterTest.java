@@ -19,6 +19,7 @@ import com.company.user.model.entity.Role;
 import com.company.user.model.entity.User;
 import com.company.user.model.entity.UserDetail;
 import com.company.user.model.vo.UserVO;
+import org.mapstruct.factory.Mappers;
 
 /**
  * UserConverter 单元测试
@@ -34,7 +35,7 @@ class UserConverterTest {
 
     @BeforeEach
     void setUp() {
-        userConverter = UserConverter.INSTANCE;
+        userConverter = Mappers.getMapper(UserConverter.class);
 
         // 初始化测试数据
         testUser = new User();
