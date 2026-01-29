@@ -112,8 +112,8 @@ public class GlobalExceptionHandler {
      * @param request HTTP请求
      * @return 统一响应结果
      */
-    @ExceptionHandler(java.sql.DuplicateKeyException.class)
-    public Result<Void> handleDuplicateKeyException(java.sql.DuplicateKeyException e, HttpServletRequest request) {
+    @ExceptionHandler(org.springframework.dao.DuplicateKeyException.class)
+    public Result<Void> handleDuplicateKeyException(org.springframework.dao.DuplicateKeyException e, HttpServletRequest request) {
         log.error("数据库唯一索引冲突 [{}]: {}", request.getRequestURI(), e.getMessage(), e);
 
         // 提取异常信息
@@ -152,10 +152,10 @@ public class GlobalExceptionHandler {
 
         // 临时默认消息（等您实现后会替换为友好提示）
         if (friendlyMessage == null) {
-            friendlyMessage = "操作失败，数据冲突（" + conflictField + "）";
+            friendlyMessage = "操作失败，数据冲突";
         }
 
-        return Result.fail(ResponseCode.SYSTEM_ERROR.getCode(), friendlyMessage);
+        return Result.fail(ResponseCode.INTERNAL_ERROR.getCode(), friendlyMessage);
     }
 
     /**
@@ -166,17 +166,19 @@ public class GlobalExceptionHandler {
     private Result<Void> handleSQLIntegrityConstraintViolation(SQLIntegrityConstraintViolationException e, HttpServletRequest request) {
         log.error("SQL约束违反 [{}]: {}", request.getRequestURI(), e.getMessage(), e);
 
-        // 提取约束名称
-        String constraintName = null;
-        try {
-            constraintName = e.getConstraintName();
-        } catch (Exception ex) {
-            log.warn("无法提取约束名称", ex);
-        }
-
+        // 提取错误信息
+        String errorMessage = e.getMessage();
         String message = "数据完整性约束违反";
-        if (constraintName != null) {
-            message += "（约束：" + constraintName + "）";
+        
+        // 尝试从错误消息中提取约束信息
+        if (errorMessage != null) {
+            if (errorMessage.contains("uk_username")) {
+                message = "用户名已存在";
+            } else if (errorMessage.contains("uk_email")) {
+                message = "邮箱已被注册";
+            } else if (errorMessage.contains("uk_phone")) {
+                message = "手机号已被注册";
+            }
         }
 
         return Result.fail(ResponseCode.INTERNAL_ERROR.getCode(), message);

@@ -1,0 +1,84 @@
+server:
+  port: 8080
+
+project:
+  info:  # 项目信息
+    title: order-platform
+
+spring:
+  main:
+    banner-mode: log  # 启动时是否打印banner，log表示打印到日志中
+  devtools:
+    restart:
+      enabled: false  # 开发环境下是否启用热部署
+  profiles:
+    active: dev  # 激活开发环境配置
+  web:
+    resources:
+      add-mappings: true  # 启用静态资源映射，SpringDoc需要这个
+  servlet:
+    multipart:
+      max-file-size: 10MB      # 单个文件最大大小
+      max-request-size: 20MB   # 整个请求最大大小
+      file-size-threshold: 2KB # 文件写入磁盘的阈值
+  jackson:
+    default-property-inclusion: non_null  # 设置JSON序列化时忽略null值
+    date-format: yyyy-MM-dd HH:mm:ss  # 日期格式（仅对Date类型有效）
+    time-zone: GMT+8 # 时间 zone
+    serialization:
+      write-dates-as-timestamps: false  # 禁用时间戳格式
+  datasource:
+    dynamic:
+      primary: user
+      strict: false   # 开启严格模式,默认false（非严格模式）. 严格模式下未匹配到数据源会抛出异常,非严格模式下则使用默认数据源.
+      datasource:
+        user:
+          url: jdbc:mysql://localhost:3306/am_user?allowPublicKeyRetrieval=true&useSSL=false
+          username: your_db_username  # 替换成你的数据库用户名
+          password: your_db_password  # 替换成你的数据库密码
+          driver-class-name: com.mysql.cj.jdbc.Driver
+        system:
+          url: jdbc:mysql://localhost:3306/am_system?allowPublicKeyRetrieval=true&useSSL=false
+          username: your_db_username  # 替换成你的数据库用户名
+          password: your_db_password  # 替换成你的数据库密码
+          driver-class-name: com.mysql.cj.jdbc.Driver
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: your_redis_password  # 替换成你的Redis密码
+
+jwt:
+  secret: your_jwt_secret_key_here  # JWT密钥，请替换成安全的256位随机字符串
+  expiration: 86400000  # 24小时, 单位: 毫秒
+  refresh-expiration: 604800000  # 7天, 单位: 毫秒
+
+mybatis-plus:
+  global-config:
+    banner: false  # 关闭MyBatis-Plus的启动logo
+  configuration:
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
+
+aliyun:
+  oss:
+    endpoint: your_oss_endpoint  # 替换成你的阿里云OSS服务的Endpoint
+    accessKeyId: your_access_key_id  # 替换成你的阿里云OSS服务的AccessKeyId
+    accessKeySecret: your_access_key_secret  # 替换成你的阿里云OSS服务的AccessKeySecret
+    bucketName: your_bucket_name  # 替换成你的阿里云OSS服务的BucketName
+    domain: your_oss_domain  # 替换成你的阿里云OSS服务的域名
+
+# SpringDoc配置 - 只保留基本配置
+springdoc:
+  api-docs:
+    enabled: true  # 启用API文档生成
+    # path: /v3/api-docs # 自定义API文档路径
+  swagger-ui:
+    enabled: true  # 启用Swagger UI
+    path: /docs # 自定义Swagger UI路径
+    # url: ${springdoc.api-docs.path:/v3/api-docs} # 指定API文档的路径
+    # 完全隐藏底部的Schemas部分
+    default-models-expand-depth: -1  # 设置为-1完全隐藏模型
+    show-common-extensions: false    # 不显示扩展信息
+    doc-expansion: none              # 不展开任何文档
+  group-configs:
+    enabled: true  # 启用分组配置

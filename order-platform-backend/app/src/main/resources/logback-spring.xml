@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- 定义日志存储根目录 -->
+    <property name="LOG_HOME" value="logs" />
+
+    <!-- 1. 控制台输出配置 - 开发时查看 -->
+    <!-- 开发环境：控制台输出详细日志 -->
+    <springProfile name="dev">
+        <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder>
+                <pattern>%d{HH:mm:ss.SSS} %highlight(%-5level) %cyan(%logger{36}) - %msg%n</pattern>
+            </encoder>
+        </appender>
+    </springProfile>
+
+    <!-- 2. 应用日志文件 - 记录所有INFO及以上级别的日志 -->
+    <appender name="APP_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_HOME}/app.log</file>
+        <!-- 按日期创建文件夹结构 -->
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_HOME}/%d{yyyy-MM-dd}/app.log</fileNamePattern>
+            <maxHistory>30</maxHistory>  <!-- 保留30天 -->
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- 3. 错误日志文件 - 只记录ERROR级别的系统异常 -->
+    <appender name="ERROR_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_HOME}/error.log</file>
+        <!-- 过滤器：只允许ERROR级别通过 -->
+        <filter class="ch.qos.logback.classic.filter.LevelFilter">
+            <level>ERROR</level>
+            <onMatch>ACCEPT</onMatch>
+            <onMismatch>DENY</onMismatch>
+        </filter>
+        <!-- 按日期创建文件夹结构 -->
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_HOME}/%d{yyyy-MM-dd}/error.log</fileNamePattern>
+            <maxHistory>30</maxHistory>  <!-- 保留30天 -->
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- 4. 警告日志文件 - 只记录WARN级别的业务异常 -->
+    <appender name="WARN_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <file>${LOG_HOME}/warn.log</file>
+    <!-- 过滤器：只允许WARN级别通过 -->
+    <filter class="ch.qos.logback.classic.filter.LevelFilter">
+        <level>WARN</level>
+        <onMatch>ACCEPT</onMatch>
+        <onMismatch>DENY</onMismatch>
+    </filter>
+    <!-- 按日期创建文件夹结构 -->
+    <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+    <fileNamePattern>${LOG_HOME}/%d{yyyy-MM-dd}/warn.log</fileNamePattern>
+    <maxHistory>30</maxHistory>  <!-- 保留30天 -->
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- 公共日志配置 - 所有环境共享 -->
+    <!-- 隐藏过于详细的日志 -->
+    <logger name="org.apache.catalina" level="WARN"/>
+    <logger name="org.springframework.web" level="WARN"/>
+    <logger name="com.zaxxer.hikari.pool" level="WARN"/>
+    <logger name="org.springframework.boot.devtools" level="WARN"/>
+    
+    <!-- 保留重要的数据库日志 -->
+    <logger name="com.zaxxer.hikari.HikariDataSource" level="INFO"/>
+    <logger name="com.baomidou.dynamic.datasource" level="INFO"/>
+
+    <!-- 开发环境：控制台 + 三个文件 -->
+    <springProfile name="dev">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>    <!-- 控制台输出 -->
+            <appender-ref ref="APP_FILE"/>   <!-- 应用日志文件 -->
+            <appender-ref ref="ERROR_FILE"/> <!-- 错误日志文件 -->
+            <appender-ref ref="WARN_FILE"/>  <!-- 警告日志文件 -->
+        </root>
+        
+        <!-- 项目包的日志级别设为DEBUG -->
+        <logger name="com.company" level="DEBUG"/>
+    </springProfile>
+
+    <!-- 生产环境：只有文件，不输出控制台 -->
+    <springProfile name="!dev">
+        <root level="INFO">
+            <appender-ref ref="APP_FILE"/>   <!-- 应用日志文件 -->
+            <appender-ref ref="ERROR_FILE"/> <!-- 错误日志文件 -->
+            <appender-ref ref="WARN_FILE"/>  <!-- 警告日志文件 -->
+        </root>
+        <!-- 生产环境项目日志级别设为INFO -->
+        <logger name="com.company" level="INFO"/>
+    </springProfile>
+</configuration>
