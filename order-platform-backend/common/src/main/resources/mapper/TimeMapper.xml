@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.common.mapper.TimeMapper">
+
+    <!-- 时间过滤包装器 -->
+    <sql id="timeFilterWrapper">
+        <if test="params != null">
+            <if test="params.createTimeStart != null">
+                AND ${createTimeColumn} &gt;= #{params.createTimeStart}
+            </if>
+            <if test="params.createTimeEnd != null">
+                AND ${createTimeColumn} &lt;= #{params.createTimeEnd}
+            </if>
+            <if test="params.updateTimeStart != null">
+                AND ${updateTimeColumn} &gt;= #{params.updateTimeStart}
+            </if>
+            <if test="params.updateTimeEnd != null">
+                AND ${updateTimeColumn} &lt;= #{params.updateTimeEnd}
+            </if>
+        </if>
+    </sql>
+
+    <!-- 排序 -->
+    <sql id="orderBy">
+        <choose>
+            <when test="params != null and params.orderBy != null">
+                ORDER BY ${params.orderBy}
+                <if test="params.orderDirection != null">
+                    ${params.orderDirection}
+                </if>
+            </when>
+            <otherwise>
+                ORDER BY ${defaultColumn} ${defaultDirection}
+            </otherwise>
+        </choose>
+    </sql>
+
+</mapper>
